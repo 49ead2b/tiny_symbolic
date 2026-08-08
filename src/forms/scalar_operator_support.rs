@@ -1,0 +1,92 @@
+//! Convenience operator overloads for combining integer scalars with symbolic values.
+//!
+//! These impls keep arithmetic ergonomic for lightweight symbolic work without introducing
+//! a separate public API surface.
+
+use crate::forms::{expression::Expression, term::Term, variable::Variable};
+use crate::impl_commutative_op;
+use std::ops::{Div, Sub};
+
+impl_commutative_op!(Add::add, +, i64, Variable, Expression);
+impl_commutative_op!(Mul::mul, *, i64, Variable, Term);
+impl_commutative_op!(Add::add, +, i64, Term, Expression);
+impl_commutative_op!(Mul::mul, *, i64, Term, Term);
+impl_commutative_op!(Add::add, +, i64, Expression, Expression);
+impl_commutative_op!(Mul::mul, *, i64, Expression, Expression);
+
+impl Sub<Variable> for i64 {
+    type Output = Expression;
+
+    fn sub(self, rhs: Variable) -> Self::Output {
+        Term::from(self) - rhs
+    }
+}
+
+impl Div<Variable> for i64 {
+    type Output = Term;
+
+    fn div(self, rhs: Variable) -> Self::Output {
+        Term::from(self) / rhs
+    }
+}
+
+impl Sub<Term> for i64 {
+    type Output = Expression;
+
+    fn sub(self, rhs: Term) -> Self::Output {
+        Term::from(self) - rhs
+    }
+}
+
+impl Div<Term> for i64 {
+    type Output = Term;
+
+    fn div(self, rhs: Term) -> Self::Output {
+        Term::from(self) / rhs
+    }
+}
+
+impl Sub<Expression> for i64 {
+    type Output = Expression;
+
+    fn sub(self, rhs: Expression) -> Self::Output {
+        Expression::from(self) - rhs
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_i64_scalar_operator_support_coverage() {
+        let x = Variable::new('x', None);
+        let y = Variable::new('y', None);
+        let expression = x + y;
+        let term = x.pow(2);
+
+        let add_variable = 3i64 + x;
+        let mul_variable = 2i64 * x;
+        let add_term = 3i64 + term.clone();
+        let mul_term = 2i64 * term.clone();
+        let add_expression = 3i64 + expression.clone();
+        let mul_expression = 2i64 * expression.clone();
+        let sub_variable = 3i64 - x;
+        let div_variable = 3i64 / x;
+        let sub_term = 3i64 - term.clone();
+        let div_term = 3i64 / term.clone();
+        let sub_expression = 3i64 - expression.clone();
+
+        assert_eq!(add_variable.to_string(), "3 + x");
+        assert_eq!(mul_variable.to_string(), "2x");
+        assert_eq!(add_term.to_string(), "3 + x²");
+        assert_eq!(mul_term.to_string(), "2x²");
+        assert_eq!(add_expression.to_string(), "3 + x + y");
+        assert_eq!(mul_expression.to_string(), "2x + 2y");
+        assert_eq!(sub_variable.to_string(), "3 - x");
+        assert_eq!(div_variable.to_string(), "3x⁻¹");
+        assert_eq!(sub_term.to_string(), "3 - x²");
+        assert_eq!(div_term.to_string(), "3x⁻²");
+        assert_eq!(sub_expression.to_string(), "3 - x - y");
+    }
+}

@@ -1,0 +1,16 @@
+[package]
+name = "tiny_symbolic"
+version = "0.1.0"
+edition = "2024"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+categories = ["math"]
+keywords = ["symbolic", "polynomial", "math", "algebra"]
+repository = "https://github.com/49ead2b/tiny_symbolic"
+description = "A minimal symbolic computation library for Rust."
+
+[dependencies]
+fmtastic = "0.2.1"
+itertools = "0.14.0"
+num = "0.4.3"
+num-integer = "0.1.46"

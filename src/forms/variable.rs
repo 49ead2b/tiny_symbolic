@@ -1,0 +1,248 @@
+use std::{
+    fmt::Display,
+    ops::{Add, Div, Mul, Neg, Sub},
+};
+
+use fmtastic::Subscript;
+use num::Rational64;
+
+use crate::{
+    forms::{expression::Expression, term::Term},
+    impl_commutative_op,
+};
+
+/// A symbolic variable identified by a name and optional subscript.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct Variable {
+    name: char,
+    subscript: Option<i64>,
+}
+
+impl Variable {
+    /// Creates a new symbolic variable.
+    pub fn new(name: char, subscript: Option<i64>) -> Self {
+        Self { name, subscript }
+    }
+
+    /// Raises the variable to the given integer power.
+    pub fn pow(self, power: i32) -> Term {
+        Term::from(self).pow(power)
+    }
+
+    pub(super) fn to_string_internal(self, is_sympy: bool) -> String {
+        if let Some(sub) = self.subscript {
+            if is_sympy {
+                format!("{}_{}", self.name, sub)
+            } else {
+                format!("{}{}", self.name, Subscript(sub))
+            }
+        } else {
+            format!("{}", self.name)
+        }
+    }
+    /// Returns the variable's SymPy-compatible string representation.
+    pub fn to_string_sympy(&self) -> String {
+        self.to_string_internal(true)
+    }
+}
+
+impl Display for Variable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let output = self.to_string_internal(false);
+        write!(f, "{}", output)
+    }
+}
+
+impl Neg for Variable {
+    type Output = Term;
+
+    fn neg(self) -> Self::Output {
+        -Term::from(self)
+    }
+}
+
+impl Add for Variable {
+    type Output = Expression;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Term::from(self) + Term::from(rhs)
+    }
+}
+
+impl Mul for Variable {
+    type Output = Term;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Term::from(self) * Term::from(rhs)
+    }
+}
+
+impl Sub for Variable {
+    type Output = Expression;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Term::from(self) - Term::from(rhs)
+    }
+}
+
+impl Div for Variable {
+    type Output = Term;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        Term::from(self) / Term::from(rhs)
+    }
+}
+
+impl_commutative_op!(Add::add, +, Variable, Term, Expression);
+
+impl_commutative_op!(Mul::mul, *, Variable, Term, Term);
+
+impl Sub<Term> for Variable {
+    type Output = Expression;
+
+    fn sub(self, rhs: Term) -> Self::Output {
+        Term::from(self) - rhs
+    }
+}
+
+impl Div<Term> for Variable {
+    type Output = Term;
+
+    fn div(self, rhs: Term) -> Self::Output {
+        Term::from(self) / rhs
+    }
+}
+
+impl<T> Add<T> for Variable
+where
+    T: Into<Rational64>,
+{
+    type Output = Expression;
+
+    fn add(self, rhs: T) -> Self::Output {
+        Term::from(self) + Term::from(rhs)
+    }
+}
+
+impl<T> Mul<T> for Variable
+where
+    T: Into<Rational64>,
+{
+    type Output = Term;
+
+    fn mul(self, rhs: T) -> Self::Output {
+        Term::from(self) * Term::from(rhs)
+    }
+}
+
+impl<T> Sub<T> for Variable
+where
+    T: Into<Rational64>,
+{
+    type Output = Expression;
+
+    fn sub(self, rhs: T) -> Self::Output {
+        Term::from(self) - Term::from(rhs)
+    }
+}
+
+impl<T> Div<T> for Variable
+where
+    T: Into<Rational64>,
+{
+    type Output = Term;
+
+    fn div(self, rhs: T) -> Self::Output {
+        Term::from(self) / Term::from(rhs)
+    }
+}
+
+impl_commutative_op!(Add::add, +, Rational64, Variable, Expression);
+
+impl_commutative_op!(Mul::mul, *, Rational64, Variable, Term);
+
+impl Sub<Variable> for Rational64 {
+    type Output = Expression;
+
+    fn sub(self, rhs: Variable) -> Self::Output {
+        Term::from(self) - Term::from(rhs)
+    }
+}
+
+impl Div<Variable> for Rational64 {
+    type Output = Term;
+
+    fn div(self, rhs: Variable) -> Self::Output {
+        Term::from(self) / Term::from(rhs)
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_variable_display_and_power() {
+        let x = Variable::new('x', None);
+        let xp2 = x.pow(2);
+
+        assert_eq!(x.to_string(), "x");
+        assert_eq!(xp2.to_string(), "x²");
+        assert!(xp2.contains_variable(&x));
+    }
+
+    #[test]
+    fn test_variable_operator_coverage() {
+        let x = Variable::new('x', None);
+        let y = Variable::new('y', None);
+
+        let negated = -x;
+        let sum = x + y;
+        let difference = x - y;
+        let product = x * y;
+        let quotient = x / y;
+        let quotient_by_term = x / Term::from(y);
+
+        let scalar_sum = x + Rational64::new(3, 1);
+        let scalar_difference = x - Rational64::new(3, 1);
+        let scalar_product = x * Rational64::new(2, 1);
+        let scalar_quotient = x / Rational64::new(2, 1);
+        let scalar_subtracted_by_variable = Rational64::new(3, 1) - x;
+        let scalar_divided_by_variable = Rational64::new(3, 1) / x;
+
+        assert_eq!(negated.to_string(), "-1x");
+        assert_eq!(sum.to_string(), "x + y");
+        assert_eq!(difference.to_string(), "x - y");
+        assert_eq!(product.to_string(), "xy");
+        assert_eq!(quotient.to_string(), "xy⁻¹");
+        assert_eq!(quotient_by_term.to_string(), "xy⁻¹");
+
+        assert_eq!(scalar_sum.to_string(), "3 + x");
+        assert_eq!(scalar_difference.to_string(), "-3 + x");
+        assert_eq!(scalar_product.multiplier(), Rational64::new(2, 1));
+        assert_eq!(scalar_product.to_string(), "2x");
+        assert_eq!(scalar_quotient.multiplier(), Rational64::new(1, 2));
+        assert_eq!(scalar_quotient.to_string(), "(1/2)x");
+        assert_eq!(scalar_subtracted_by_variable.to_string(), "3 - x");
+        assert_eq!(scalar_divided_by_variable.to_string(), "3x⁻¹");
+    }
+
+    #[test]
+    fn test_variable_arithmetic_conversions() {
+        let x = Variable::new('x', None);
+        let expr = x + 3;
+        let term = x * 2;
+
+        assert!(expr.contains_variable(&x));
+        assert!(term.contains_variable(&x));
+        assert_eq!(term.multiplier(), Rational64::new(2, 1));
+    }
+
+    #[test]
+    fn test_to_print_sympy() {
+        let x = Variable::new('x', None);
+        let y = Variable::new('y', Some(3));
+
+        assert!(x.to_string_sympy() == "x");
+        assert!(y.to_string_sympy() == "y_3");
+    }
+}

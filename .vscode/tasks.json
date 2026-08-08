@@ -1,0 +1,22 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "rust: cargo build",
+            "type": "shell",
+            // The command to execute (builds the debug version)
+            "command": "cargo build",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always"
+            },
+            // Watches for output patterns to determine success/failure
+            "problemMatcher": [
+                "$rustc"
+            ]
+        }
+    ]
+}

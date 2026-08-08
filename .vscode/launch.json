@@ -1,0 +1,34 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            // Use the Microsoft C/C++ extension's debugger type for Windows
+            "type": "cppvsdbg", 
+            "request": "launch",
+            "name": "Debug Rust Binary (MSVC)",
+            
+            // --- CORE RUST SETTINGS ---
+            // 'program' must point to the compiled executable. 
+            // ${workspaceFolderBasename} is your crate/folder name (e.g., 'hello_world')
+            "program": "${workspaceFolder}/target/debug/${workspaceFolderBasename}.exe",
+            
+            // Runs 'cargo build' before debugging starts
+            "preLaunchTask": "rust: cargo build",
+            
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+
+            // --- UTF-8 / CONSOLE FIX (Addresses your original problem) ---
+            // Setting console to externalTerminal opens a new, separate CMD window, 
+            // which handles UTF-8 output from Rust programs better than the internal console.
+            "console": "externalTerminal",
+
+            // Optional: Settings for the C/C++ Debugger
+            "sourceFileMap": {
+                // Helps the debugger map Rust standard library paths for stepping into std code
+                "/rustc/*": "${env:USERPROFILE}/.rustup/toolchains/stable-x86_64-pc-windows-msvc/lib/rustlib/src/rust"
+            }
+        }
+    ]
+}
