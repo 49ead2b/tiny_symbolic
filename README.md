@@ -103,7 +103,8 @@ This prints a SymPy-friendly form `(4/3)*x*(y**3) + z`.
 The `ElementarySymmetricPolynomials` helper lets you reason about symmetric expressions in terms of elementary symmetric functions.
 
 ```rust
-use tiny_symbolic::{ElementarySymmetricPolynomials, Variable};
+use tiny_symbolic::Variable;
+use tiny_symbolic::algos::ElementarySymmetricPolynomials;
 
 fn main() {
     let a = Variable::new('A', None);
@@ -132,7 +133,7 @@ This is the intended pattern for turning a symmetric polynomial into a more conv
 - `tiny_symbolic::Variable`
 - `tiny_symbolic::Term`
 - `tiny_symbolic::Expression`
-- `tiny_symbolic::ElementarySymmetricPolynomials`
+- `tiny_symbolic::algos::ElementarySymmetricPolynomials`
 
 ## License
 

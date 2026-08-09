@@ -1,4 +1,5 @@
 use tiny_symbolic::Variable;
+use tiny_symbolic::algos::ElementarySymmetricPolynomials;
 
 fn main() {
     let x = Variable::new('x', None);
@@ -26,4 +27,9 @@ fn main() {
         .substitute_variable_power_with_expression(w, 2, -1 - w);
 
     println!("{substituted}"); //Will output -3ABC + A³ + B³ + C³
+
+    let mut esp_engine = ElementarySymmetricPolynomials::from_variables(&vec![a, b, c]);
+    let expr_as_esp = esp_engine.simplify_symmetric_expression(substituted);
+
+    println!("{expr_as_esp}"); //Will output -3e₁e₂ + e₁³
 }
