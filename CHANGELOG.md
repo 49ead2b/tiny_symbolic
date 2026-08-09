@@ -11,3 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial release of the library.
 - Core data structures(Variable, Term, Expression) and basic helper functions.
 - Algorithm for simplifying Elementary Symmetric Polynomials
+
+## [0.2.0] - 2026-08-09
+
+### Changed
+- Export ElementarySymmetricPolynomials under algos instead of crate root.
