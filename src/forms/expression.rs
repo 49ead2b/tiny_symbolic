@@ -7,8 +7,10 @@ use std::{
 };
 
 use crate::{
+    RationalExpression,
     forms::{term::Term, variable::Variable},
     impl_commutative_op,
+    operations::derivative::PartialDerivative,
 };
 
 /// A symbolic expression consisting of a sum of terms.
@@ -158,7 +160,7 @@ impl Expression {
         self.to_string_internal(true)
     }
 
-    fn to_string_internal(&self, is_sympy: bool) -> String {
+    pub(super) fn to_string_internal(&self, is_sympy: bool) -> String {
         if self.terms.is_empty() {
             return "0".to_string();
         }
@@ -315,6 +317,22 @@ impl SubAssign for Expression {
     }
 }
 
+impl Sub<RationalExpression> for Expression {
+    type Output = RationalExpression;
+
+    fn sub(self, rhs: RationalExpression) -> Self::Output {
+        -(rhs - self)
+    }
+}
+
+impl Div<RationalExpression> for Expression {
+    type Output = RationalExpression;
+
+    fn div(self, rhs: RationalExpression) -> Self::Output {
+        (rhs / self).inverse()
+    }
+}
+
 impl Add<Term> for Expression {
     type Output = Expression;
 
@@ -428,6 +446,8 @@ impl Mul<Variable> for Expression {
         self * Term::from(rhs)
     }
 }
+
+impl_commutative_op!(Mul::mul, *, Variable, Expression, Expression);
 
 impl MulAssign<Variable> for Expression {
     fn mul_assign(&mut self, rhs: Variable) {
@@ -555,9 +575,29 @@ impl Sub<Expression> for Rational64 {
     }
 }
 
+impl PartialDerivative for Expression {
+    fn calculate_derivate_wrt_variable(&self, variable: &Variable) -> Self {
+        let mut output = Expression::default();
+        let terms = self.clone().dissolve_into_terms();
+        for term in terms {
+            output += term.calculate_derivate_wrt_variable(variable);
+        }
+        output
+    }
+    fn calculate_nth_derivate_wrt_variable(&self, n: usize, variable: &Variable) -> Self {
+        let mut output = Expression::default();
+        let terms = self.clone().dissolve_into_terms();
+        for term in terms {
+            output += term.calculate_nth_derivate_wrt_variable(n, variable);
+        }
+        output
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fmtastic::Superscript;
 
     #[test]
     fn test_basic() {
@@ -805,5 +845,35 @@ mod tests {
         let expression = x.pow(2) * y.pow(3) * 4 + z;
 
         assert!(expression.to_string_sympy() == "4*(x**2)*(y**3) + z");
+    }
+
+    #[test]
+    fn test_partial_derivative() {
+        let x = Variable::new('x', None);
+        let y = Variable::new('y', None);
+        let z = Variable::new('z', None);
+        let expression = x.pow(2) * y.pow(3) * 4 + z;
+
+        let expected = format!("8xy{}", Superscript(3));
+        assert_eq!(
+            expression.calculate_derivate_wrt_variable(&x).to_string(),
+            expected
+        );
+
+        let expected = format!("24x{}", Superscript(2));
+        assert_eq!(
+            expression
+                .calculate_nth_derivate_wrt_variable(3, &y)
+                .to_string(),
+            expected
+        );
+
+        let expected = format!("4x{}y{} + z", Superscript(2), Superscript(3));
+        assert_eq!(
+            expression
+                .calculate_nth_derivate_wrt_variable(0, &z)
+                .to_string(),
+            expected
+        );
     }
 }

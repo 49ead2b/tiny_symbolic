@@ -7,6 +7,7 @@ use fmtastic::Subscript;
 use num::Rational64;
 
 use crate::{
+    RationalExpression,
     forms::{expression::Expression, term::Term},
     impl_commutative_op,
 };
@@ -160,6 +161,22 @@ where
 impl_commutative_op!(Add::add, +, Rational64, Variable, Expression);
 
 impl_commutative_op!(Mul::mul, *, Rational64, Variable, Term);
+
+impl Sub<RationalExpression> for Variable {
+    type Output = RationalExpression;
+
+    fn sub(self, rhs: RationalExpression) -> Self::Output {
+        -(rhs - self)
+    }
+}
+
+impl Div<RationalExpression> for Variable {
+    type Output = RationalExpression;
+
+    fn div(self, rhs: RationalExpression) -> Self::Output {
+        (rhs / self).inverse()
+    }
+}
 
 impl Sub<Variable> for Rational64 {
     type Output = Expression;

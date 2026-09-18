@@ -1,0 +1,5 @@
+# 1. Run tests and generate the HTML report folder
+cargo llvm-cov --html
+
+# 2. Use the report subcommand to export the lcov file from the existing data
+cargo llvm-cov report --lcov --output-path lcov.info
