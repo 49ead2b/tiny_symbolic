@@ -1,6 +1,6 @@
 use fmtastic::Superscript;
 use num::{Rational64, Zero};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::Hash;
 use std::ops::{Add, Div, DivAssign, MulAssign, Neg, Sub};
 use std::{fmt::Display, ops::Mul};
@@ -294,6 +294,32 @@ impl Term {
         }
 
         residue
+    }
+
+    /// Compute LCM of terms. Returns a term that is the least common multiple of the input terms.
+    /// The LCM is computed by taking the maximum power of each variable across all terms.
+    /// LCM of multipliers is not considered
+    pub fn lcm(terms: impl IntoIterator<Item = Term>) -> Term {
+        let mut lcm_multiplier = Rational64::new(1, 1);
+
+        let mut variables_powers = HashMap::new();
+
+        for term in terms {
+            lcm_multiplier *= term.multiplier;
+            for (variable, power) in term.variables {
+                variables_powers
+                    .entry(variable)
+                    .and_modify(|max_power: &mut i32| *max_power = (*max_power).max(power))
+                    .or_insert(power);
+            }
+        }
+
+        let lcm_variables = variables_powers
+            .into_iter()
+            .map(|(v, p)| v.pow(p))
+            .fold(Term::default(), Mul::mul);
+
+        lcm_multiplier * lcm_variables
     }
 }
 
@@ -827,5 +853,28 @@ mod tests {
         assert!(scalar.is_scalar());
         assert!(term.contains_variable(&y));
         assert!(!term.contains_variable(&x));
+    }
+
+    #[test]
+    fn test_term_lcm() {
+        let w = Variable::new('w', None);
+        let x = Variable::new('x', None);
+        let y = Variable::new('y', None);
+        let z = Variable::new('z', None);
+        let terms = vec![
+            w.pow(-2) * z.pow(-7) * Rational64::new(2, 7),
+            y.pow(3) * x.pow(-7) * Rational64::new(3, 14),
+            x.pow(5) * z.pow(-4) * Rational64::new(5, 3),
+        ];
+
+        let lcm = Term::lcm(terms);
+        let expected = Rational64::new(2, 7)
+            * Rational64::new(3, 14)
+            * Rational64::new(5, 3)
+            * w.pow(-2)
+            * y.pow(3)
+            * x.pow(5)
+            * z.pow(-4);
+        assert_eq!(lcm.to_string(), expected.to_string());
     }
 }

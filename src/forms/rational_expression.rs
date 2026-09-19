@@ -1,15 +1,27 @@
 use crate::*;
 use num::Rational64;
 use std::{
+    collections::HashMap,
     fmt::Display,
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
-/// Rational expression consisting of a numerator and a denominator, both of which are expression.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// Rational expression consisting of a numerator and a denominator, both of which are expression
+/// Since multiplying numerator and denominator with the same thing does not change the value
+/// So values of numerator and denominator maybe individually different based on the construction
+/// Even though taken together, they are mathematically identical
+#[derive(Debug, Clone, Eq)]
 pub struct RationalExpression {
     numerator: Expression,
     denominator: Expression,
+}
+
+impl PartialEq for RationalExpression {
+    fn eq(&self, other: &Self) -> bool {
+        let (s_num, s_den) = self.clone().dissolve_into_numerator_and_denominator();
+        let (o_num, o_den) = other.clone().dissolve_into_numerator_and_denominator();
+        s_num * o_den == s_den * o_num
+    }
 }
 
 impl RationalExpression {
@@ -103,6 +115,61 @@ impl RationalExpression {
         self.numerator.is_scalar() && self.denominator.is_scalar()
     }
 
+    fn get_term_to_set_power_sign(expression: &Expression, is_positive: bool) -> Term {
+        let mut variables_powers = HashMap::new();
+        for term in expression.terms() {
+            for (variable, power) in term.variables() {
+                if is_positive && *power < 0 {
+                    variables_powers
+                        .entry(*variable)
+                        .and_modify(|min_power: &mut i32| *min_power = (*min_power).min(*power))
+                        .or_insert(*power);
+                } else if !is_positive && *power > 0 {
+                    variables_powers
+                        .entry(*variable)
+                        .and_modify(|max_power: &mut i32| *max_power = (*max_power).min(*power))
+                        .or_insert(*power);
+                }
+            }
+        }
+
+        variables_powers
+            .into_iter()
+            .map(|(v, p)| v.pow(p))
+            .fold(Term::default(), Mul::mul)
+            .pow(-1)
+    }
+
+    /// Get Rational Expression with all variables having positive number
+    /// Done my multiplying numerator and denominator with same term
+    /// Usually used before to_string() to display in a more readable format
+    pub fn change_to_positive_power(self) -> Self {
+        let (numerator, denominator) = self.dissolve_into_numerator_and_denominator();
+        let numerator_norm = Self::get_term_to_set_power_sign(&numerator, true);
+        let denominator_norm = Self::get_term_to_set_power_sign(&denominator, true);
+
+        let terms_lcm = Term::lcm(vec![numerator_norm, denominator_norm]);
+        Self {
+            numerator: terms_lcm.clone() * numerator,
+            denominator: terms_lcm * denominator,
+        }
+    }
+
+    /// Get Rational Expression with all variables having negative number
+    /// Done my multiplying numerator and denominator with same term
+    /// Usually used before to_string() to display in a more readable format
+    pub fn change_to_negative_power(self) -> Self {
+        let (numerator, denominator) = self.dissolve_into_numerator_and_denominator();
+        let numerator_norm = Self::get_term_to_set_power_sign(&numerator, false);
+        let denominator_norm = Self::get_term_to_set_power_sign(&denominator, false);
+
+        let terms_lcm = Term::lcm(vec![numerator_norm, denominator_norm]);
+        Self {
+            numerator: terms_lcm.clone() * numerator,
+            denominator: terms_lcm * denominator,
+        }
+    }
+
     /// Returns the rational expression's SymPy-compatible string representation.
     pub fn to_string_sympy(&self) -> String {
         self.to_string_internal(true)
@@ -185,7 +252,7 @@ where
     type Output = Self;
 
     fn add(self, rhs: T) -> Self::Output {
-        let rhs = RationalExpression::from(rhs);
+        let rhs = RationalExpression::from(rhs.into());
         self + rhs
     }
 }
@@ -219,7 +286,7 @@ where
     type Output = Self;
 
     fn sub(self, rhs: T) -> Self::Output {
-        let rhs = RationalExpression::from(rhs);
+        let rhs = RationalExpression::from(rhs.into());
         self - rhs
     }
 }
@@ -248,7 +315,7 @@ where
     type Output = Self;
 
     fn mul(self, rhs: T) -> Self::Output {
-        let rhs = RationalExpression::from(rhs);
+        let rhs = RationalExpression::from(rhs.into());
         self * rhs
     }
 }
@@ -282,7 +349,7 @@ where
     type Output = Self;
 
     fn div(self, rhs: T) -> Self::Output {
-        let rhs = RationalExpression::from(rhs);
+        let rhs = RationalExpression::from(rhs.into());
         self / rhs
     }
 }
@@ -295,6 +362,8 @@ impl DivAssign for RationalExpression {
 
 #[cfg(test)]
 mod tests {
+    use num::traits::Inv;
+
     use super::*;
 
     fn rational(numerator: i64, denominator: i64) -> RationalExpression {
@@ -474,6 +543,14 @@ mod tests {
             expression.to_string_internal(true),
             expression.to_string_sympy()
         );
+        assert_eq!(
+            expression.clone().pow(2).to_string(),
+            "(2xy₃ + x² + y₃²)/(1 + 2x² + x⁴)"
+        );
+        assert_eq!(
+            expression.clone().pow(-2).to_string_sympy(),
+            "(1 + 2*(x**2) + x**4)/(2*x*y_3 + x**2 + y_3**2)"
+        );
     }
 
     #[test]
@@ -504,5 +581,64 @@ mod tests {
     #[should_panic(expected = "Division by 0!")]
     fn test_division_by_zero_rational_expression() {
         let _ = rational(1, 2) / rational(0, 1);
+    }
+
+    #[test]
+    fn test_rational_expression_from_term() {
+        let w = Variable::new('w', None);
+        let x = Variable::new('x', None);
+        let y = Variable::new('y', None);
+        let z = Variable::new('z', None);
+        let term = w.pow(-2) * y.pow(3) * x.pow(-7) * z.pow(4) * Rational64::new(7, 5);
+
+        let rational_expression = RationalExpression::from(term);
+
+        assert_eq!(
+            rational_expression.change_to_positive_power().to_string(),
+            "((7/5)y³z⁴)/(w²x⁷)"
+        );
+    }
+
+    #[test]
+    fn test_rational_expression_from_expression() {
+        let w = Variable::new('w', None);
+        let x = Variable::new('x', None);
+        let y = Variable::new('y', None);
+        let z = Variable::new('z', None);
+        let expression = w.pow(-2) * z.pow(-7) * Rational64::new(2, 7)
+            + y.pow(3) * x.pow(-7) * Rational64::new(3, 14)
+            + x.pow(5) * z.pow(-4) * Rational64::new(5, 3);
+
+        let rational_expression = RationalExpression::new(expression.clone(), expression.pow(2));
+
+        assert_eq!(
+            rational_expression
+                .clone()
+                .change_to_positive_power()
+                .to_string(),
+            "((2/7)w²x¹⁴z⁷ + (3/14)w⁴x⁷y³z¹⁴ + (5/3)w⁴x¹⁹z¹⁰)/((6/49)w²x⁷y³z⁷ + (20/21)w²x¹⁹z³ + (5/7)w⁴x¹²y³z¹⁰ + (25/9)w⁴x²⁴z⁶ + (9/196)w⁴y⁶z¹⁴ + (4/49)x¹⁴)"
+        );
+
+        assert_eq!(
+            rational_expression
+                .clone()
+                .change_to_negative_power()
+                .to_string(),
+            "((2/7)w⁻²x⁻⁵y⁻³z⁻⁷ + (3/14)x⁻¹² + (5/3)y⁻³z⁻⁴)/((4/49)w⁻⁴x⁻⁵y⁻³z⁻¹⁴ + (6/49)w⁻²x⁻¹²z⁻⁷ + (20/21)w⁻²y⁻³z⁻¹¹ + (9/196)x⁻¹⁹y³ + (5/7)x⁻⁷z⁻⁴ + (25/9)x⁵y⁻³z⁻⁸)"
+        );
+    }
+
+    #[test]
+    fn test_rational_expression_equality() {
+        let x = Variable::new('x', None);
+        let y = Variable::new('y', None);
+
+        let rational_expression_v1 =
+            RationalExpression::new((x + y) * Rational64::new(4, 3), (x + y).pow(2));
+
+        let rational_expression_v2 =
+            RationalExpression::new(1.into(), Rational64::new(4, 3).inv() * (x + y));
+
+        assert_eq!(rational_expression_v1, rational_expression_v2);
     }
 }
