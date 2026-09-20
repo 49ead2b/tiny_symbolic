@@ -1,7 +1,10 @@
-use std::{fmt::Display, ops::Add};
+use std::{
+    fmt::Display,
+    ops::{Add, Div, Mul, Sub},
+};
 
 use crate::{
-    Term,
+    RationalExpression, Term,
     algos::ElementarySymmetricPolynomials,
     forms::{expression::Expression, variable::Variable},
     operations::derivative::PartialDerivative,
@@ -62,19 +65,10 @@ impl Polynomial {
 
     /// Computes the derivative wrt to the variable of the polynomial.
     pub fn compute_nth_derivative(&self, n: usize) -> Self {
-        let output = self.construct_polynomial_expression();
+        let output = Expression::from(self);
         let output = output.calculate_nth_derivate_wrt_variable(n, &self.variable);
 
         Self::from_expression(output, self.variable)
-    }
-
-    /// Constructs an Expression from the polynomial by summing the coefficients multiplied by the variable raised to the appropriate power.
-    pub fn construct_polynomial_expression(&self) -> Expression {
-        self.coefficients
-            .iter()
-            .enumerate()
-            .map(|(power, coefficient)| coefficient.clone() * self.variable.pow(power as i32))
-            .fold(Expression::default(), Add::add)
     }
 
     /// Constructs an ElementarySymmetricPolynomials object for the roots of the polynomial, using a specified variable to represent the roots.
@@ -145,7 +139,7 @@ impl Polynomial {
 
     /// Evaluates polynomial for the input expression
     pub fn eval_at_expression<T: Into<Expression>>(&self, expression: T) -> Expression {
-        let poly_expression = self.construct_polynomial_expression();
+        let poly_expression = Expression::from(self);
         poly_expression.substitute_multiple_variables_with_expressions(std::iter::once((
             self.variable,
             expression,
@@ -156,6 +150,120 @@ impl Polynomial {
 impl Display for Polynomial {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_string_internal(false))
+    }
+}
+
+impl From<&Polynomial> for Expression {
+    fn from(polynomial: &Polynomial) -> Self {
+        polynomial
+            .coefficients
+            .iter()
+            .enumerate()
+            .map(|(power, coefficient)| coefficient.clone() * polynomial.variable.pow(power as i32))
+            .fold(Expression::default(), Add::add)
+    }
+}
+
+impl From<Polynomial> for Expression {
+    fn from(polynomial: Polynomial) -> Self {
+        Expression::from(&polynomial)
+    }
+}
+
+impl Add<Polynomial> for Polynomial {
+    type Output = Polynomial;
+
+    fn add(self, rhs: Polynomial) -> Self::Output {
+        if self.variable != rhs.variable {
+            panic!("Cannot add polynomials with different variables!");
+        }
+
+        let max_order = usize::max(self.order, rhs.order);
+        let mut new_coefficients = vec![Expression::default(); max_order + 1];
+
+        for (i, coeff) in self.coefficients.into_iter().enumerate() {
+            new_coefficients[i] += coeff;
+        }
+
+        for (i, coeff) in rhs.coefficients.into_iter().enumerate() {
+            new_coefficients[i] += coeff;
+        }
+
+        Polynomial::new(self.variable, new_coefficients)
+    }
+}
+
+impl Sub<Polynomial> for Polynomial {
+    type Output = Polynomial;
+
+    fn sub(self, rhs: Polynomial) -> Self::Output {
+        if self.variable != rhs.variable {
+            panic!("Cannot subtract polynomials with different variables!");
+        }
+
+        let max_order = usize::max(self.order, rhs.order);
+        let mut new_coefficients = vec![Expression::default(); max_order + 1];
+
+        for (i, coeff) in self.coefficients.into_iter().enumerate() {
+            new_coefficients[i] += coeff;
+        }
+
+        for (i, coeff) in rhs.coefficients.into_iter().enumerate() {
+            new_coefficients[i] -= coeff;
+        }
+
+        Polynomial::new(self.variable, new_coefficients)
+    }
+}
+
+impl Mul<Polynomial> for Polynomial {
+    type Output = Polynomial;
+
+    fn mul(self, rhs: Polynomial) -> Self::Output {
+        if self.variable != rhs.variable {
+            panic!("Cannot multiply polynomials with different variables!");
+        }
+
+        let variable = self.variable;
+        let expression1 = Expression::from(self);
+        let expression2 = Expression::from(rhs);
+        let product_expression = expression1 * expression2;
+
+        Polynomial::from_expression(product_expression, variable)
+    }
+}
+
+impl Div<Polynomial> for Polynomial {
+    type Output = RationalExpression;
+
+    fn div(self, rhs: Polynomial) -> Self::Output {
+        if self.variable != rhs.variable {
+            panic!("Cannot divide polynomials with different variables!");
+        }
+
+        let expression1 = Expression::from(self);
+        let expression2 = Expression::from(rhs);
+
+        expression1 / expression2
+    }
+}
+
+impl PartialDerivative for Polynomial {
+    fn calculate_derivate_wrt_variable(&self, variable: &Variable) -> Self {
+        let expression = Expression::from(self);
+        let derivative_expression = expression.calculate_derivate_wrt_variable(variable);
+
+        Polynomial::from_expression(derivative_expression, self.variable)
+    }
+
+    fn calculate_nth_derivate_wrt_variable(&self, n: usize, variable: &Variable) -> Self
+    where
+        Self: Sized,
+    {
+        let expression = Expression::from(self);
+        let derivative_expression = expression.calculate_nth_derivate_wrt_variable(n, variable);
+
+        Polynomial::from_expression(derivative_expression, self.variable)
     }
 }
 

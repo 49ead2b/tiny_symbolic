@@ -333,6 +333,14 @@ impl Div<RationalExpression> for Expression {
     }
 }
 
+impl Div<Expression> for Expression {
+    type Output = RationalExpression;
+
+    fn div(self, rhs: Expression) -> Self::Output {
+        RationalExpression::from(self) / RationalExpression::from(rhs)
+    }
+}
+
 impl Add<Term> for Expression {
     type Output = Expression;
 
