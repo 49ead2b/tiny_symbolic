@@ -182,6 +182,17 @@ impl RationalExpression {
             self.denominator.to_string_internal(is_sympy)
         )
     }
+
+    /// Multiplies both the numerator and denominator of the rational expression by the given value.
+    pub fn with_numerator_and_denominator_multiplied_by_expression<T: Into<Expression>>(
+        mut self,
+        value: T,
+    ) -> Self {
+        let value = value.into();
+        self.numerator *= value.clone();
+        self.denominator *= value;
+        self
+    }
 }
 
 impl Default for RationalExpression {

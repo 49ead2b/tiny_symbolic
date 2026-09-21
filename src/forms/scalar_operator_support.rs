@@ -5,7 +5,9 @@
 
 use num::{Integer, Rational64};
 
-use crate::forms::{expression::Expression, term::Term, variable::Variable};
+use crate::forms::{
+    expression::Expression, rational_expression::RationalExpression, term::Term, variable::Variable,
+};
 use crate::impl_commutative_op;
 use std::ops::{Div, Sub};
 
@@ -15,6 +17,8 @@ impl_commutative_op!(Add::add, +, i64, Term, Expression);
 impl_commutative_op!(Mul::mul, *, i64, Term, Term);
 impl_commutative_op!(Add::add, +, i64, Expression, Expression);
 impl_commutative_op!(Mul::mul, *, i64, Expression, Expression);
+impl_commutative_op!(Add::add, +, i64, RationalExpression, RationalExpression);
+impl_commutative_op!(Mul::mul, *, i64, RationalExpression, RationalExpression);
 
 impl Sub<Variable> for i64 {
     type Output = Expression;
