@@ -19,9 +19,15 @@ pub struct Polynomial {
 }
 
 impl Polynomial {
-    /// Create a Polynomial from a variable and a vector of coefficients. The coefficients are in order of increasing power of the variable.
+    /// Create a Polynomial from a variable and a vector of coefficients.
+    /// The coefficients are in order of increasing power of the variable.
+    /// Leading coefficient cannot be zero, and if the coefficients vector is empty,
+    /// the polynomial is considered to be the zero polynomial.
     pub fn new(variable: Variable, coefficients: Vec<impl Into<Expression>>) -> Self {
         let coefficients: Vec<Expression> = coefficients.into_iter().map(|ex| ex.into()).collect();
+        if coefficients.len() > 1 && coefficients.last().is_some_and(|ex| ex.is_zero()) {
+            panic!("Leading coefficient cannot be zero!");
+        }
         if coefficients.is_empty() {
             Self {
                 variable,
