@@ -1,64 +1,4 @@
-//! Convenience operator overloads for combining integer scalars with symbolic values.
-//!
-//! These impls keep arithmetic ergonomic for lightweight symbolic work without introducing
-//! a separate public API surface.
-
 use num::{Integer, Rational64};
-
-use crate::forms::{
-    expression::Expression, rational_expression::RationalExpression, term::Term, variable::Variable,
-};
-use crate::impl_commutative_op;
-use std::ops::{Div, Sub};
-
-impl_commutative_op!(Add::add, +, i64, Variable, Expression);
-impl_commutative_op!(Mul::mul, *, i64, Variable, Term);
-impl_commutative_op!(Add::add, +, i64, Term, Expression);
-impl_commutative_op!(Mul::mul, *, i64, Term, Term);
-impl_commutative_op!(Add::add, +, i64, Expression, Expression);
-impl_commutative_op!(Mul::mul, *, i64, Expression, Expression);
-impl_commutative_op!(Add::add, +, i64, RationalExpression, RationalExpression);
-impl_commutative_op!(Mul::mul, *, i64, RationalExpression, RationalExpression);
-
-impl Sub<Variable> for i64 {
-    type Output = Expression;
-
-    fn sub(self, rhs: Variable) -> Self::Output {
-        Term::from(self) - rhs
-    }
-}
-
-impl Div<Variable> for i64 {
-    type Output = Term;
-
-    fn div(self, rhs: Variable) -> Self::Output {
-        Term::from(self) / rhs
-    }
-}
-
-impl Sub<Term> for i64 {
-    type Output = Expression;
-
-    fn sub(self, rhs: Term) -> Self::Output {
-        Term::from(self) - rhs
-    }
-}
-
-impl Div<Term> for i64 {
-    type Output = Term;
-
-    fn div(self, rhs: Term) -> Self::Output {
-        Term::from(self) / rhs
-    }
-}
-
-impl Sub<Expression> for i64 {
-    type Output = Expression;
-
-    fn sub(self, rhs: Expression) -> Self::Output {
-        Expression::from(self) - rhs
-    }
-}
 
 /// Computes the least common multiple of two rational numbers.
 pub fn rational_lcm(x: &Rational64, y: &Rational64) -> Rational64 {
@@ -69,6 +9,8 @@ pub fn rational_lcm(x: &Rational64, y: &Rational64) -> Rational64 {
 
 #[cfg(test)]
 mod tests {
+    use crate::Variable;
+
     use super::*;
 
     #[test]

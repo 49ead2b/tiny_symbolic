@@ -1,21 +1,13 @@
-use std::{
-    fmt::Display,
-    ops::{Add, Div, Mul, Sub},
-};
+use std::fmt::Display;
 
-use crate::{
-    RationalExpression, Term,
-    algos::ElementarySymmetricPolynomials,
-    forms::{expression::Expression, variable::Variable},
-    operations::derivative::PartialDerivative,
-};
+use crate::{algos::ElementarySymmetricPolynomials, operations::derivative::PartialDerivative, *};
 
 /// A polynomial consisting of expression coefficients and a variable raised to a successive power.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Polynomial {
-    variable: Variable,
-    coefficients: Vec<Expression>,
-    order: usize,
+    pub(super) variable: Variable,
+    pub(super) coefficients: Vec<Expression>,
+    pub(super) order: usize,
 }
 
 impl Polynomial {
@@ -166,91 +158,13 @@ impl From<&Polynomial> for Expression {
             .iter()
             .enumerate()
             .map(|(power, coefficient)| coefficient.clone() * polynomial.variable.pow(power as i32))
-            .fold(Expression::default(), Add::add)
+            .fold(Expression::default(), std::ops::Add::add)
     }
 }
 
 impl From<Polynomial> for Expression {
     fn from(polynomial: Polynomial) -> Self {
         Expression::from(&polynomial)
-    }
-}
-
-impl Add<Polynomial> for Polynomial {
-    type Output = Polynomial;
-
-    fn add(self, rhs: Polynomial) -> Self::Output {
-        if self.variable != rhs.variable {
-            panic!("Cannot add polynomials with different variables!");
-        }
-
-        let max_order = usize::max(self.order, rhs.order);
-        let mut new_coefficients = vec![Expression::default(); max_order + 1];
-
-        for (i, coeff) in self.coefficients.into_iter().enumerate() {
-            new_coefficients[i] += coeff;
-        }
-
-        for (i, coeff) in rhs.coefficients.into_iter().enumerate() {
-            new_coefficients[i] += coeff;
-        }
-
-        Polynomial::new(self.variable, new_coefficients)
-    }
-}
-
-impl Sub<Polynomial> for Polynomial {
-    type Output = Polynomial;
-
-    fn sub(self, rhs: Polynomial) -> Self::Output {
-        if self.variable != rhs.variable {
-            panic!("Cannot subtract polynomials with different variables!");
-        }
-
-        let max_order = usize::max(self.order, rhs.order);
-        let mut new_coefficients = vec![Expression::default(); max_order + 1];
-
-        for (i, coeff) in self.coefficients.into_iter().enumerate() {
-            new_coefficients[i] += coeff;
-        }
-
-        for (i, coeff) in rhs.coefficients.into_iter().enumerate() {
-            new_coefficients[i] -= coeff;
-        }
-
-        Polynomial::new(self.variable, new_coefficients)
-    }
-}
-
-impl Mul<Polynomial> for Polynomial {
-    type Output = Polynomial;
-
-    fn mul(self, rhs: Polynomial) -> Self::Output {
-        if self.variable != rhs.variable {
-            panic!("Cannot multiply polynomials with different variables!");
-        }
-
-        let variable = self.variable;
-        let expression1 = Expression::from(self);
-        let expression2 = Expression::from(rhs);
-        let product_expression = expression1 * expression2;
-
-        Polynomial::from_expression(product_expression, variable)
-    }
-}
-
-impl Div<Polynomial> for Polynomial {
-    type Output = RationalExpression;
-
-    fn div(self, rhs: Polynomial) -> Self::Output {
-        if self.variable != rhs.variable {
-            panic!("Cannot divide polynomials with different variables!");
-        }
-
-        let expression1 = Expression::from(self);
-        let expression2 = Expression::from(rhs);
-
-        expression1 / expression2
     }
 }
 

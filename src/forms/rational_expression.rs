@@ -1,10 +1,5 @@
 use crate::{operations::derivative::PartialDerivative, *};
-use num::Rational64;
-use std::{
-    collections::HashMap,
-    fmt::Display,
-    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
-};
+use std::{collections::HashMap, fmt::Display, ops::Mul};
 
 /// Rational expression consisting of a numerator and a denominator, both of which are expression
 /// Since multiplying numerator and denominator with the same thing does not change the value
@@ -12,8 +7,8 @@ use std::{
 /// Even though taken together, they are mathematically identical
 #[derive(Debug, Clone, Eq)]
 pub struct RationalExpression {
-    numerator: Expression,
-    denominator: Expression,
+    pub(super) numerator: Expression,
+    pub(super) denominator: Expression,
 }
 
 impl PartialEq for RationalExpression {
@@ -248,140 +243,6 @@ impl Display for RationalExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let output = self.to_string_internal(false);
         write!(f, "{output}")
-    }
-}
-
-impl Neg for RationalExpression {
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
-        Self::new(-self.numerator, self.denominator)
-    }
-}
-
-impl Add for RationalExpression {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self::new(
-            self.numerator * rhs.denominator.clone() + rhs.numerator * self.denominator.clone(),
-            self.denominator * rhs.denominator,
-        )
-    }
-}
-
-impl<T> Add<T> for RationalExpression
-where
-    T: Into<Expression>,
-{
-    type Output = Self;
-
-    fn add(self, rhs: T) -> Self::Output {
-        let rhs = RationalExpression::from(rhs.into());
-        self + rhs
-    }
-}
-
-impl_commutative_op!(Add::add, +, Expression, RationalExpression, RationalExpression);
-impl_commutative_op!(Add::add, +, Term, RationalExpression, RationalExpression);
-impl_commutative_op!(Add::add, +, Variable, RationalExpression, RationalExpression);
-impl_commutative_op!(Add::add, +, Rational64, RationalExpression, RationalExpression);
-
-impl AddAssign for RationalExpression {
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.clone() + rhs;
-    }
-}
-
-impl Sub for RationalExpression {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Self::new(
-            self.numerator * rhs.denominator.clone() - rhs.numerator * self.denominator.clone(),
-            self.denominator * rhs.denominator,
-        )
-    }
-}
-
-impl<T> Sub<T> for RationalExpression
-where
-    T: Into<Expression>,
-{
-    type Output = Self;
-
-    fn sub(self, rhs: T) -> Self::Output {
-        let rhs = RationalExpression::from(rhs.into());
-        self - rhs
-    }
-}
-
-impl SubAssign for RationalExpression {
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = self.clone() - rhs;
-    }
-}
-
-impl Mul for RationalExpression {
-    type Output = Self;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        Self::new(
-            self.numerator * rhs.numerator,
-            self.denominator * rhs.denominator,
-        )
-    }
-}
-
-impl<T> Mul<T> for RationalExpression
-where
-    T: Into<Expression>,
-{
-    type Output = Self;
-
-    fn mul(self, rhs: T) -> Self::Output {
-        let rhs = RationalExpression::from(rhs.into());
-        self * rhs
-    }
-}
-
-impl_commutative_op!(Mul::mul, *, Expression, RationalExpression, RationalExpression);
-impl_commutative_op!(Mul::mul, *, Term, RationalExpression, RationalExpression);
-impl_commutative_op!(Mul::mul, *, Variable, RationalExpression, RationalExpression);
-impl_commutative_op!(Mul::mul, *, Rational64, RationalExpression, RationalExpression);
-
-impl MulAssign for RationalExpression {
-    fn mul_assign(&mut self, rhs: Self) {
-        *self = self.clone() * rhs;
-    }
-}
-
-impl Div for RationalExpression {
-    type Output = Self;
-
-    fn div(self, rhs: Self) -> Self::Output {
-        Self::new(
-            self.numerator * rhs.denominator,
-            self.denominator * rhs.numerator,
-        )
-    }
-}
-
-impl<T> Div<T> for RationalExpression
-where
-    T: Into<Expression>,
-{
-    type Output = Self;
-
-    fn div(self, rhs: T) -> Self::Output {
-        let rhs = RationalExpression::from(rhs.into());
-        self / rhs
-    }
-}
-
-impl DivAssign for RationalExpression {
-    fn div_assign(&mut self, rhs: Self) {
-        *self = self.clone() / rhs;
     }
 }
 

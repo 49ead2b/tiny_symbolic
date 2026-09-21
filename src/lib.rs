@@ -13,3 +13,5 @@ pub use forms::{
     expression::Expression, polynomial::Polynomial, rational_expression::RationalExpression,
     term::Term, variable::Variable,
 };
+
+pub use num::Rational64;

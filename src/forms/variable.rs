@@ -1,16 +1,8 @@
-use std::{
-    fmt::Display,
-    ops::{Add, Div, Mul, Neg, Sub},
-};
+use std::fmt::Display;
 
 use fmtastic::Subscript;
-use num::Rational64;
 
-use crate::{
-    RationalExpression,
-    forms::{expression::Expression, term::Term},
-    impl_commutative_op,
-};
+use crate::*;
 
 /// A symbolic variable identified by a name and optional subscript.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -54,147 +46,10 @@ impl Display for Variable {
     }
 }
 
-impl Neg for Variable {
-    type Output = Term;
-
-    fn neg(self) -> Self::Output {
-        -Term::from(self)
-    }
-}
-
-impl Add for Variable {
-    type Output = Expression;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Term::from(self) + Term::from(rhs)
-    }
-}
-
-impl Mul for Variable {
-    type Output = Term;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        Term::from(self) * Term::from(rhs)
-    }
-}
-
-impl Sub for Variable {
-    type Output = Expression;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Term::from(self) - Term::from(rhs)
-    }
-}
-
-impl Div for Variable {
-    type Output = Term;
-
-    fn div(self, rhs: Self) -> Self::Output {
-        Term::from(self) / Term::from(rhs)
-    }
-}
-
-impl_commutative_op!(Add::add, +, Variable, Term, Expression);
-
-impl_commutative_op!(Mul::mul, *, Variable, Term, Term);
-
-impl Sub<Term> for Variable {
-    type Output = Expression;
-
-    fn sub(self, rhs: Term) -> Self::Output {
-        Term::from(self) - rhs
-    }
-}
-
-impl Div<Term> for Variable {
-    type Output = Term;
-
-    fn div(self, rhs: Term) -> Self::Output {
-        Term::from(self) / rhs
-    }
-}
-
-impl<T> Add<T> for Variable
-where
-    T: Into<Rational64>,
-{
-    type Output = Expression;
-
-    fn add(self, rhs: T) -> Self::Output {
-        Term::from(self) + Term::from(rhs)
-    }
-}
-
-impl<T> Mul<T> for Variable
-where
-    T: Into<Rational64>,
-{
-    type Output = Term;
-
-    fn mul(self, rhs: T) -> Self::Output {
-        Term::from(self) * Term::from(rhs)
-    }
-}
-
-impl<T> Sub<T> for Variable
-where
-    T: Into<Rational64>,
-{
-    type Output = Expression;
-
-    fn sub(self, rhs: T) -> Self::Output {
-        Term::from(self) - Term::from(rhs)
-    }
-}
-
-impl<T> Div<T> for Variable
-where
-    T: Into<Rational64>,
-{
-    type Output = Term;
-
-    fn div(self, rhs: T) -> Self::Output {
-        Term::from(self) / Term::from(rhs)
-    }
-}
-
-impl_commutative_op!(Add::add, +, Rational64, Variable, Expression);
-
-impl_commutative_op!(Mul::mul, *, Rational64, Variable, Term);
-
-impl Sub<RationalExpression> for Variable {
-    type Output = RationalExpression;
-
-    fn sub(self, rhs: RationalExpression) -> Self::Output {
-        -(rhs - self)
-    }
-}
-
-impl Div<RationalExpression> for Variable {
-    type Output = RationalExpression;
-
-    fn div(self, rhs: RationalExpression) -> Self::Output {
-        (rhs / self).inverse()
-    }
-}
-
-impl Sub<Variable> for Rational64 {
-    type Output = Expression;
-
-    fn sub(self, rhs: Variable) -> Self::Output {
-        Term::from(self) - Term::from(rhs)
-    }
-}
-
-impl Div<Variable> for Rational64 {
-    type Output = Term;
-
-    fn div(self, rhs: Variable) -> Self::Output {
-        Term::from(self) / Term::from(rhs)
-    }
-}
 #[cfg(test)]
 mod tests {
+    use num::Rational64;
+
     use super::*;
 
     #[test]
