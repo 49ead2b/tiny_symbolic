@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{operations::derivative::PartialDerivative, *};
 use num::Rational64;
 use std::{
     collections::HashMap,
@@ -21,6 +21,20 @@ impl PartialEq for RationalExpression {
         let (s_num, s_den) = self.clone().dissolve_into_numerator_and_denominator();
         let (o_num, o_den) = other.clone().dissolve_into_numerator_and_denominator();
         s_num * o_den == s_den * o_num
+    }
+}
+
+impl PartialDerivative for RationalExpression {
+    fn calculate_derivate_wrt_variable(&self, variable: &Variable) -> Self {
+        let (numerator, denominator) = self.clone().dissolve_into_numerator_and_denominator();
+        let numerator_derivative = numerator.calculate_derivate_wrt_variable(variable);
+        let denominator_derivative = denominator.calculate_derivate_wrt_variable(variable);
+
+        let new_numerator =
+            numerator_derivative * denominator.clone() - numerator.clone() * denominator_derivative;
+        let new_denominator = denominator.pow(2);
+
+        Self::new(new_numerator, new_denominator)
     }
 }
 
@@ -637,6 +651,24 @@ mod tests {
                 .to_string(),
             "((2/7)w⁻²x⁻⁵y⁻³z⁻⁷ + (3/14)x⁻¹² + (5/3)y⁻³z⁻⁴)/((4/49)w⁻⁴x⁻⁵y⁻³z⁻¹⁴ + (6/49)w⁻²x⁻¹²z⁻⁷ + (20/21)w⁻²y⁻³z⁻¹¹ + (9/196)x⁻¹⁹y³ + (5/7)x⁻⁷z⁻⁴ + (25/9)x⁵y⁻³z⁻⁸)"
         );
+    }
+
+    #[test]
+    fn test_rational_expression_partial_derivative() {
+        let x = Variable::new('x', None);
+        let numerator: Expression = x.pow(2) + 1;
+        let denominator: Expression = x + 1;
+        let expression = RationalExpression::new(numerator.clone(), denominator.clone());
+
+        let derivative = expression.calculate_derivate_wrt_variable(&x);
+        let expected = RationalExpression::new(
+            numerator.clone().calculate_derivate_wrt_variable(&x) * denominator.clone()
+                - numerator.clone() * denominator.calculate_derivate_wrt_variable(&x),
+            denominator.clone().pow(2),
+        );
+
+        assert_eq!(derivative, expected);
+        assert_eq!(derivative.to_string(), "(-1 + 2x + x²)/(1 + 2x + x²)");
     }
 
     #[test]
