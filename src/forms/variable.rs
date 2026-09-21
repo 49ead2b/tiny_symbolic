@@ -18,7 +18,7 @@ impl Variable {
     }
 
     /// Raises the variable to the given integer power.
-    pub fn pow(self, power: i32) -> Term {
+    pub fn pow(self, power: TermVariablePowerType) -> Term {
         Term::from(self).pow(power)
     }
 
@@ -48,7 +48,7 @@ impl Display for Variable {
 
 #[cfg(test)]
 mod tests {
-    use num::Rational64;
+    use crate::TermMultiplierType;
 
     use super::*;
 
@@ -74,12 +74,12 @@ mod tests {
         let quotient = x / y;
         let quotient_by_term = x / Term::from(y);
 
-        let scalar_sum = x + Rational64::new(3, 1);
-        let scalar_difference = x - Rational64::new(3, 1);
-        let scalar_product = x * Rational64::new(2, 1);
-        let scalar_quotient = x / Rational64::new(2, 1);
-        let scalar_subtracted_by_variable = Rational64::new(3, 1) - x;
-        let scalar_divided_by_variable = Rational64::new(3, 1) / x;
+        let scalar_sum = x + TermMultiplierType::new(3, 1);
+        let scalar_difference = x - TermMultiplierType::new(3, 1);
+        let scalar_product = x * TermMultiplierType::new(2, 1);
+        let scalar_quotient = x / TermMultiplierType::new(2, 1);
+        let scalar_subtracted_by_variable = TermMultiplierType::new(3, 1) - x;
+        let scalar_divided_by_variable = TermMultiplierType::new(3, 1) / x;
 
         assert_eq!(negated.to_string(), "-1x");
         assert_eq!(sum.to_string(), "x + y");
@@ -90,9 +90,9 @@ mod tests {
 
         assert_eq!(scalar_sum.to_string(), "3 + x");
         assert_eq!(scalar_difference.to_string(), "-3 + x");
-        assert_eq!(scalar_product.multiplier(), Rational64::new(2, 1));
+        assert_eq!(scalar_product.multiplier(), TermMultiplierType::new(2, 1));
         assert_eq!(scalar_product.to_string(), "2x");
-        assert_eq!(scalar_quotient.multiplier(), Rational64::new(1, 2));
+        assert_eq!(scalar_quotient.multiplier(), TermMultiplierType::new(1, 2));
         assert_eq!(scalar_quotient.to_string(), "(1/2)x");
         assert_eq!(scalar_subtracted_by_variable.to_string(), "3 - x");
         assert_eq!(scalar_divided_by_variable.to_string(), "3x⁻¹");
@@ -106,7 +106,7 @@ mod tests {
 
         assert!(expr.contains_variable(&x));
         assert!(term.contains_variable(&x));
-        assert_eq!(term.multiplier(), Rational64::new(2, 1));
+        assert_eq!(term.multiplier(), TermMultiplierType::new(2, 1));
     }
 
     #[test]

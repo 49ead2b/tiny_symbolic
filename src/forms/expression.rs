@@ -1,7 +1,8 @@
-use num::Rational64;
+use crate::TermMultiplierType;
 use std::{collections::BTreeMap, fmt::Display, iter::Sum, ops::Add};
 
 use crate::{
+    TermVariablePowerType,
     forms::{term::Term, variable::Variable},
     operations::derivative::PartialDerivative,
 };
@@ -9,7 +10,7 @@ use crate::{
 /// A symbolic expression consisting of a sum of terms.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct Expression {
-    pub(super) terms: BTreeMap<BTreeMap<Variable, i32>, Rational64>,
+    pub(super) terms: BTreeMap<BTreeMap<Variable, TermVariablePowerType>, TermMultiplierType>,
 }
 
 impl Expression {
@@ -28,7 +29,7 @@ impl Expression {
 
     /// Raises this expression to a power
     /// Raising to a negative power is not supported in this version unless self is just a Term
-    pub fn pow(self, power: i32) -> Self {
+    pub fn pow(self, power: TermVariablePowerType) -> Self {
         if power == 0 {
             if self.is_zero() {
                 panic!("0 to the power of 0 is undefined!");
@@ -88,7 +89,7 @@ impl Expression {
     pub fn substitute_variable_power_with_expression(
         self,
         variable: Variable,
-        known_power: i32,
+        known_power: TermVariablePowerType,
         subst: Expression,
     ) -> Expression {
         let mut expression = Expression::default();
@@ -224,7 +225,7 @@ impl From<Variable> for Expression {
 
 impl<T> From<T> for Expression
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     fn from(value: T) -> Self {
         Expression::from(Term::from(value))
@@ -289,10 +290,10 @@ mod tests {
         let product = (x + y) * x;
         let quotient = (x + y) / x;
 
-        let scalar_sum = (x + y) + Rational64::new(3, 1);
-        let scalar_difference = (x + y) - Rational64::new(3, 1);
-        let scalar_product = (x + y) * Rational64::new(2, 1);
-        let scalar_quotient = (x + y) / Rational64::new(2, 1);
+        let scalar_sum = (x + y) + TermMultiplierType::new(3, 1);
+        let scalar_difference = (x + y) - TermMultiplierType::new(3, 1);
+        let scalar_product = (x + y) * TermMultiplierType::new(2, 1);
+        let scalar_quotient = (x + y) / TermMultiplierType::new(2, 1);
 
         assert_eq!(sum.to_string(), "x + x² + y");
         assert_eq!(difference.to_string(), "y");
@@ -323,13 +324,13 @@ mod tests {
         add_assign_expression += x + y;
 
         let mut add_assign_scalar = x + y;
-        add_assign_scalar += Rational64::new(3, 1);
+        add_assign_scalar += TermMultiplierType::new(3, 1);
 
         let mut mul_assign_variable = x + y;
         mul_assign_variable *= x;
 
         let mut mul_assign_scalar = x + y;
-        mul_assign_scalar *= Rational64::new(2, 1);
+        mul_assign_scalar *= TermMultiplierType::new(2, 1);
 
         let mut mul_assign_expression = x + y;
         mul_assign_expression *= x + y;
@@ -338,7 +339,7 @@ mod tests {
         sub_assign_variable -= x;
 
         let mut sub_assign_scalar = x + y;
-        sub_assign_scalar -= Rational64::new(3, 1);
+        sub_assign_scalar -= TermMultiplierType::new(3, 1);
 
         let mut sub_assign_expression = x + y;
         sub_assign_expression -= x + y;
@@ -350,9 +351,9 @@ mod tests {
         div_assign_term /= x_term.clone();
 
         let mut div_assign_scalar = x + y;
-        div_assign_scalar /= Rational64::new(2, 1);
+        div_assign_scalar /= TermMultiplierType::new(2, 1);
 
-        let scalar_sub_expression = Rational64::new(3, 1) - (x + y);
+        let scalar_sub_expression = TermMultiplierType::new(3, 1) - (x + y);
 
         assert_eq!(summed.to_string(), "x + x² + y");
         assert_eq!(negated.to_string(), "-x - y");
@@ -376,7 +377,7 @@ mod tests {
         let vp1 = Variable::new('y', Some(2)).pow(3);
         let vp2 = Variable::new('x', Some(1)).pow(4);
 
-        let term = (vp1 * vp2.clone()) * Rational64::new(3, 2);
+        let term = (vp1 * vp2.clone()) * TermMultiplierType::new(3, 2);
         let expr = term + vp2.clone();
 
         assert!(expr.contains_term(&vp2));
@@ -475,7 +476,7 @@ mod tests {
     fn test_expression_helper_behaviors() {
         let x = Variable::new('x', None);
         let y = Variable::new('y', None);
-        let scalar_expression = Expression::from(Rational64::new(3, 1));
+        let scalar_expression = Expression::from(TermMultiplierType::new(3, 1));
         let divisible_expression = x.pow(2) * y + x;
         let multi_term_expression = x + y;
 

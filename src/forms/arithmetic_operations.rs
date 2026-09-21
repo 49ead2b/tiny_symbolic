@@ -1,4 +1,4 @@
-use num::Rational64;
+use crate::TermMultiplierType;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use crate::{
@@ -67,7 +67,7 @@ impl Div<Term> for Variable {
 
 impl<T> Add<T> for Variable
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     type Output = Expression;
 
@@ -78,7 +78,7 @@ where
 
 impl<T> Mul<T> for Variable
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     type Output = Term;
 
@@ -89,7 +89,7 @@ where
 
 impl<T> Sub<T> for Variable
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     type Output = Expression;
 
@@ -100,7 +100,7 @@ where
 
 impl<T> Div<T> for Variable
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     type Output = Term;
 
@@ -109,8 +109,8 @@ where
     }
 }
 
-impl_commutative_op!(Add::add, +, Rational64, Variable, Expression);
-impl_commutative_op!(Mul::mul, *, Rational64, Variable, Term);
+impl_commutative_op!(Add::add, +, TermMultiplierType, Variable, Expression);
+impl_commutative_op!(Mul::mul, *, TermMultiplierType, Variable, Term);
 
 impl Sub<RationalExpression> for Variable {
     type Output = RationalExpression;
@@ -128,7 +128,7 @@ impl Div<RationalExpression> for Variable {
     }
 }
 
-impl Sub<Variable> for Rational64 {
+impl Sub<Variable> for TermMultiplierType {
     type Output = Expression;
 
     fn sub(self, rhs: Variable) -> Self::Output {
@@ -136,7 +136,7 @@ impl Sub<Variable> for Rational64 {
     }
 }
 
-impl Div<Variable> for Rational64 {
+impl Div<Variable> for TermMultiplierType {
     type Output = Term;
 
     fn div(self, rhs: Variable) -> Self::Output {
@@ -274,7 +274,7 @@ impl DivAssign<Variable> for Term {
 
 impl<T> Add<T> for Term
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     type Output = Expression;
 
@@ -285,7 +285,7 @@ where
 
 impl<T> Mul<T> for Term
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     type Output = Term;
 
@@ -297,7 +297,7 @@ where
 
 impl<T> MulAssign<T> for Term
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     fn mul_assign(&mut self, rhs: T) {
         let rhs_value = rhs.into();
@@ -315,7 +315,7 @@ where
 
 impl<T> Sub<T> for Term
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     type Output = Expression;
 
@@ -326,7 +326,7 @@ where
 
 impl<T> Div<T> for Term
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     type Output = Term;
 
@@ -338,7 +338,7 @@ where
 
 impl<T> DivAssign<T> for Term
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     fn div_assign(&mut self, rhs: T) {
         let rhs_value = rhs.into();
@@ -373,10 +373,10 @@ impl Sub<Expression> for Term {
     }
 }
 
-impl_commutative_op!(Add::add, +, Rational64, Term, Expression);
-impl_commutative_op!(Mul::mul, *, Rational64, Term, Term);
+impl_commutative_op!(Add::add, +, TermMultiplierType, Term, Expression);
+impl_commutative_op!(Mul::mul, *, TermMultiplierType, Term, Term);
 
-impl Sub<Term> for Rational64 {
+impl Sub<Term> for TermMultiplierType {
     type Output = Expression;
 
     fn sub(self, rhs: Term) -> Self::Output {
@@ -384,7 +384,7 @@ impl Sub<Term> for Rational64 {
     }
 }
 
-impl Div<Term> for Rational64 {
+impl Div<Term> for TermMultiplierType {
     type Output = Term;
 
     fn div(self, rhs: Term) -> Self::Output {
@@ -637,7 +637,7 @@ impl DivAssign<Variable> for Expression {
 
 impl<T> Add<T> for Expression
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     type Output = Expression;
 
@@ -648,7 +648,7 @@ where
 
 impl<T> AddAssign<T> for Expression
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     fn add_assign(&mut self, rhs: T) {
         *self = self.clone() + rhs
@@ -657,7 +657,7 @@ where
 
 impl<T> Mul<T> for Expression
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     type Output = Expression;
 
@@ -668,7 +668,7 @@ where
 
 impl<T> MulAssign<T> for Expression
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     fn mul_assign(&mut self, rhs: T) {
         *self = self.clone() * rhs
@@ -677,7 +677,7 @@ where
 
 impl<T> Sub<T> for Expression
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     type Output = Expression;
 
@@ -688,7 +688,7 @@ where
 
 impl<T> SubAssign<T> for Expression
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     fn sub_assign(&mut self, rhs: T) {
         *self = self.clone() - rhs
@@ -697,7 +697,7 @@ where
 
 impl<T> Div<T> for Expression
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     type Output = Expression;
 
@@ -708,17 +708,17 @@ where
 
 impl<T> DivAssign<T> for Expression
 where
-    T: Into<Rational64>,
+    T: Into<TermMultiplierType>,
 {
     fn div_assign(&mut self, rhs: T) {
         *self = self.clone() / rhs
     }
 }
 
-impl_commutative_op!(Add::add, +, Rational64, Expression, Expression);
-impl_commutative_op!(Mul::mul, *, Rational64, Expression, Expression);
+impl_commutative_op!(Add::add, +, TermMultiplierType, Expression, Expression);
+impl_commutative_op!(Mul::mul, *, TermMultiplierType, Expression, Expression);
 
-impl Sub<Expression> for Rational64 {
+impl Sub<Expression> for TermMultiplierType {
     type Output = Expression;
 
     fn sub(self, rhs: Expression) -> Self::Output {
@@ -760,7 +760,7 @@ where
 impl_commutative_op!(Add::add, +, Expression, RationalExpression, RationalExpression);
 impl_commutative_op!(Add::add, +, Term, RationalExpression, RationalExpression);
 impl_commutative_op!(Add::add, +, Variable, RationalExpression, RationalExpression);
-impl_commutative_op!(Add::add, +, Rational64, RationalExpression, RationalExpression);
+impl_commutative_op!(Add::add, +, TermMultiplierType, RationalExpression, RationalExpression);
 
 impl AddAssign for RationalExpression {
     fn add_assign(&mut self, rhs: Self) {
@@ -823,7 +823,7 @@ where
 impl_commutative_op!(Mul::mul, *, Expression, RationalExpression, RationalExpression);
 impl_commutative_op!(Mul::mul, *, Term, RationalExpression, RationalExpression);
 impl_commutative_op!(Mul::mul, *, Variable, RationalExpression, RationalExpression);
-impl_commutative_op!(Mul::mul, *, Rational64, RationalExpression, RationalExpression);
+impl_commutative_op!(Mul::mul, *, TermMultiplierType, RationalExpression, RationalExpression);
 
 impl MulAssign for RationalExpression {
     fn mul_assign(&mut self, rhs: Self) {
@@ -938,16 +938,16 @@ impl Div<Polynomial> for Polynomial {
     }
 }
 
-impl_commutative_op!(Add::add, +, i64, Variable, Expression);
-impl_commutative_op!(Mul::mul, *, i64, Variable, Term);
-impl_commutative_op!(Add::add, +, i64, Term, Expression);
-impl_commutative_op!(Mul::mul, *, i64, Term, Term);
-impl_commutative_op!(Add::add, +, i64, Expression, Expression);
-impl_commutative_op!(Mul::mul, *, i64, Expression, Expression);
-impl_commutative_op!(Add::add, +, i64, RationalExpression, RationalExpression);
-impl_commutative_op!(Mul::mul, *, i64, RationalExpression, RationalExpression);
+impl_commutative_op!(Add::add, +, TermVariablePowerType, Variable, Expression);
+impl_commutative_op!(Mul::mul, *, TermVariablePowerType, Variable, Term);
+impl_commutative_op!(Add::add, +, TermVariablePowerType, Term, Expression);
+impl_commutative_op!(Mul::mul, *, TermVariablePowerType, Term, Term);
+impl_commutative_op!(Add::add, +, TermVariablePowerType, Expression, Expression);
+impl_commutative_op!(Mul::mul, *, TermVariablePowerType, Expression, Expression);
+impl_commutative_op!(Add::add, +, TermVariablePowerType, RationalExpression, RationalExpression);
+impl_commutative_op!(Mul::mul, *, TermVariablePowerType, RationalExpression, RationalExpression);
 
-impl Sub<Variable> for i64 {
+impl Sub<Variable> for TermVariablePowerType {
     type Output = Expression;
 
     fn sub(self, rhs: Variable) -> Self::Output {
@@ -955,7 +955,7 @@ impl Sub<Variable> for i64 {
     }
 }
 
-impl Div<Variable> for i64 {
+impl Div<Variable> for TermVariablePowerType {
     type Output = Term;
 
     fn div(self, rhs: Variable) -> Self::Output {
@@ -963,7 +963,7 @@ impl Div<Variable> for i64 {
     }
 }
 
-impl Sub<Term> for i64 {
+impl Sub<Term> for TermVariablePowerType {
     type Output = Expression;
 
     fn sub(self, rhs: Term) -> Self::Output {
@@ -971,7 +971,7 @@ impl Sub<Term> for i64 {
     }
 }
 
-impl Div<Term> for i64 {
+impl Div<Term> for TermVariablePowerType {
     type Output = Term;
 
     fn div(self, rhs: Term) -> Self::Output {
@@ -979,7 +979,7 @@ impl Div<Term> for i64 {
     }
 }
 
-impl Sub<Expression> for i64 {
+impl Sub<Expression> for TermVariablePowerType {
     type Output = Expression;
 
     fn sub(self, rhs: Expression) -> Self::Output {

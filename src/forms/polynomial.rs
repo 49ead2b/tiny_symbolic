@@ -115,9 +115,16 @@ impl Polynomial {
             if k > 0 {
                 if is_sympy {
                     data.push('*');
-                    data.push_str(&poly_variable.pow(k as i32).to_string_sympy());
+                    data.push_str(
+                        &poly_variable
+                            .pow(k as TermVariablePowerType)
+                            .to_string_sympy(),
+                    );
                 } else {
-                    data.push_str(&format!("{}", poly_variable.pow(k as i32)));
+                    data.push_str(&format!(
+                        "{}",
+                        poly_variable.pow(k as TermVariablePowerType)
+                    ));
                 }
             }
 
@@ -157,7 +164,9 @@ impl From<&Polynomial> for Expression {
             .coefficients
             .iter()
             .enumerate()
-            .map(|(power, coefficient)| coefficient.clone() * polynomial.variable.pow(power as i32))
+            .map(|(power, coefficient)| {
+                coefficient.clone() * polynomial.variable.pow(power as TermVariablePowerType)
+            })
             .fold(Expression::default(), std::ops::Add::add)
     }
 }

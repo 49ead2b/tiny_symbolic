@@ -1,10 +1,11 @@
-use num::{Integer, Rational64};
+use crate::*;
+use num::Integer;
 
 /// Computes the least common multiple of two rational numbers.
-pub fn rational_lcm(x: &Rational64, y: &Rational64) -> Rational64 {
+pub fn rational_lcm(x: &TermMultiplierType, y: &TermMultiplierType) -> TermMultiplierType {
     let num = x.numer().lcm(y.numer());
     let den = x.denom().gcd(y.denom());
-    Rational64::new(num, den)
+    TermMultiplierType::new(num, den)
 }
 
 #[cfg(test)]
@@ -47,15 +48,15 @@ mod tests {
 
     #[test]
     fn test_rational_lcm() {
-        let a = Rational64::new(2, 7);
-        let b = Rational64::new(3, 14);
-        let c = Rational64::new(5, 3);
+        let a = TermMultiplierType::new(2, 7);
+        let b = TermMultiplierType::new(3, 14);
+        let c = TermMultiplierType::new(5, 3);
         let lcm = rational_lcm(&rational_lcm(&a, &b), &c);
-        assert_eq!(lcm, Rational64::new(30, 1));
+        assert_eq!(lcm, TermMultiplierType::new(30, 1));
 
-        let b = Rational64::new(3, 4);
-        let c = Rational64::new(3, 2);
+        let b = TermMultiplierType::new(3, 4);
+        let c = TermMultiplierType::new(3, 2);
         let lcm = rational_lcm(&b, &c);
-        assert_eq!(lcm, Rational64::new(3, 2));
+        assert_eq!(lcm, TermMultiplierType::new(3, 2));
     }
 }

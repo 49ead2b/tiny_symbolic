@@ -2,6 +2,11 @@
 #![deny(missing_docs)]
 #![deny(warnings)]
 
+/// Type alias for the power of a term variables within Term
+pub type TermVariablePowerType = i64;
+/// Type alias for the multiplier of a term within Term
+pub type TermMultiplierType = Rational64;
+
 /// Module for algorithms related to symbolic mathematics.
 pub mod algos;
 /// Module for the fundamental structs for symbolic computation
@@ -14,4 +19,4 @@ pub use forms::{
     term::Term, variable::Variable,
 };
 
-pub use num::Rational64;
+pub use num::*;
