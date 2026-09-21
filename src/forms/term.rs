@@ -1,13 +1,14 @@
 use fmtastic::Superscript;
 use num::{Rational64, Zero};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::Hash;
 use std::ops::{Add, Div, DivAssign, MulAssign, Neg, Sub};
 use std::{fmt::Display, ops::Mul};
 
 use crate::forms::expression::Expression;
 use crate::forms::variable::Variable;
-use crate::impl_commutative_op;
+use crate::operations::derivative::PartialDerivative;
+use crate::{RationalExpression, impl_commutative_op};
 
 /// A symbolic term consisting of a rational multiplier and a product of variables raised to integer exponents.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -246,14 +247,33 @@ impl Term {
         true
     }
 
-    /// Returns a new term with the specified variable removed, if it exists.
+    /// Returns true if the multiplier is non zero and variable has non zero power in term.
     pub fn contains_variable(&self, variable: &Variable) -> bool {
-        self.variables.contains_key(variable)
+        if let Some(power) = self.variables.get(variable) {
+            *power != 0 && self.multiplier != 0.into()
+        } else {
+            false
+        }
     }
 
     /// Returns the power of the specified variable in the term, or 0 if the variable is not present.
     pub fn get_power_of_variable(&self, variable: &Variable) -> i32 {
         self.variables.get(variable).copied().unwrap_or(0)
+    }
+
+    /// Set the power of the specified variable in the term.
+    /// Implicitly a term contains all variables raised to power of zero
+    /// So this in essence will create the variable even if term previously did not contain it
+    /// as long as power is non zero
+    pub fn set_power_of_variable(&mut self, variable: &Variable, power: i32) {
+        if power == 0 {
+            self.variables.remove_entry(variable);
+        } else {
+            self.variables
+                .entry(*variable)
+                .and_modify(|p| *p = power)
+                .or_insert(power);
+        }
     }
 
     /// Return true if the term is a scalar (i.e., it has no variables).
@@ -266,12 +286,64 @@ impl Term {
         let mut residue = Term::default();
 
         for variable in variables {
-            if let Some(power) = self.variables.remove(variable) {
-                residue *= variable.pow(power);
+            if let Some(power) = self.variables.remove(variable)
+                && power != 0
+            {
+                residue.variables.insert(*variable, power);
             }
         }
 
         residue
+    }
+
+    /// Compute LCM of terms. Returns a term that is the least common multiple of the input terms.
+    /// The LCM is computed by taking the maximum power of each variable across all terms.
+    /// LCM of multipliers is not considered
+    pub fn lcm(terms: impl IntoIterator<Item = Term>) -> Term {
+        let mut lcm_multiplier = Rational64::new(1, 1);
+
+        let mut variables_powers = HashMap::new();
+
+        for term in terms {
+            lcm_multiplier *= term.multiplier;
+            for (variable, power) in term.variables {
+                variables_powers
+                    .entry(variable)
+                    .and_modify(|max_power: &mut i32| *max_power = (*max_power).max(power))
+                    .or_insert(power);
+            }
+        }
+
+        let lcm_variables = variables_powers
+            .into_iter()
+            .map(|(v, p)| v.pow(p))
+            .fold(Term::default(), Mul::mul);
+
+        lcm_multiplier * lcm_variables
+    }
+}
+
+impl PartialDerivative for Term {
+    fn calculate_derivate_wrt_variable(&self, variable: &Variable) -> Self {
+        let mut output = self.clone();
+        let mut residue = output.remove_variables(std::iter::once(variable));
+        let power = residue.get_power_of_variable(variable);
+        residue.set_power_of_variable(variable, power - 1);
+        residue *= Rational64::from(power as i64);
+        residue * output
+    }
+    fn calculate_nth_derivate_wrt_variable(&self, n: usize, variable: &Variable) -> Self {
+        let mut output = self.clone();
+        let mut residue = output.remove_variables(std::iter::once(variable));
+        let power = residue.get_power_of_variable(variable) as isize;
+        let smallest = power - (n as isize);
+        let mut multiplier = 1;
+        for m in (smallest + 1)..=power {
+            multiplier *= m;
+        }
+        residue.set_power_of_variable(variable, smallest as i32);
+        residue *= Rational64::from(multiplier as i64);
+        residue * output
     }
 }
 
@@ -324,6 +396,10 @@ impl Mul for Term {
 impl MulAssign for Term {
     fn mul_assign(&mut self, rhs: Self) {
         self.multiplier *= rhs.multiplier();
+        if self.multiplier() == 0.into() {
+            self.variables.clear();
+            return;
+        }
         for (variable, power) in rhs.variables {
             if let Some(current_power) = self.variables.get_mut(&variable) {
                 *current_power += power;
@@ -356,6 +432,9 @@ impl Div for Term {
 
 impl DivAssign for Term {
     fn div_assign(&mut self, rhs: Self) {
+        if rhs.multiplier() == 0.into() {
+            panic!("Division by 0!");
+        }
         self.multiplier /= rhs.multiplier();
         for (variable, power) in rhs.variables {
             if let Some(current_power) = self.variables.get_mut(&variable) {
@@ -445,7 +524,16 @@ where
     T: Into<Rational64>,
 {
     fn mul_assign(&mut self, rhs: T) {
-        self.multiplier *= rhs.into();
+        let rhs_value = rhs.into();
+        if rhs_value == 0.into() {
+            self.variables.clear();
+            self.multiplier = 0.into();
+            return;
+        }
+        self.multiplier *= rhs_value;
+        if self.multiplier() == 0.into() {
+            self.variables.clear();
+        }
     }
 }
 
@@ -477,7 +565,27 @@ where
     T: Into<Rational64>,
 {
     fn div_assign(&mut self, rhs: T) {
-        self.multiplier /= rhs.into();
+        let rhs_value = rhs.into();
+        if rhs_value == 0.into() {
+            panic!("Division by 0!");
+        }
+        self.multiplier /= rhs_value;
+    }
+}
+
+impl Sub<RationalExpression> for Term {
+    type Output = RationalExpression;
+
+    fn sub(self, rhs: RationalExpression) -> Self::Output {
+        -(rhs - self)
+    }
+}
+
+impl Div<RationalExpression> for Term {
+    type Output = RationalExpression;
+
+    fn div(self, rhs: RationalExpression) -> Self::Output {
+        (rhs / self).inverse()
     }
 }
 
@@ -546,6 +654,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "Division by 0!")]
     fn test_term_operator_coverage() {
         let x = Variable::new('x', None);
         let y = Variable::new('y', None);
@@ -591,6 +700,10 @@ mod tests {
         assert_eq!(scalar_quotient.to_string(), "(1/2)xy");
         assert_eq!(scalar_minus_term.to_string(), "3 - xy");
         assert_eq!(scalar_divide_term.to_string(), "3x⁻¹y⁻¹");
+
+        let mut temp = Term::default();
+        let zero: Term = 0.into();
+        temp /= zero;
     }
 
     #[test]
@@ -740,5 +853,28 @@ mod tests {
         assert!(scalar.is_scalar());
         assert!(term.contains_variable(&y));
         assert!(!term.contains_variable(&x));
+    }
+
+    #[test]
+    fn test_term_lcm() {
+        let w = Variable::new('w', None);
+        let x = Variable::new('x', None);
+        let y = Variable::new('y', None);
+        let z = Variable::new('z', None);
+        let terms = vec![
+            w.pow(-2) * z.pow(-7) * Rational64::new(2, 7),
+            y.pow(3) * x.pow(-7) * Rational64::new(3, 14),
+            x.pow(5) * z.pow(-4) * Rational64::new(5, 3),
+        ];
+
+        let lcm = Term::lcm(terms);
+        let expected = Rational64::new(2, 7)
+            * Rational64::new(3, 14)
+            * Rational64::new(5, 3)
+            * w.pow(-2)
+            * y.pow(3)
+            * x.pow(5)
+            * z.pow(-4);
+        assert_eq!(lcm.to_string(), expected.to_string());
     }
 }

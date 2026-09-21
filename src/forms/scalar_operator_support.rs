@@ -3,7 +3,11 @@
 //! These impls keep arithmetic ergonomic for lightweight symbolic work without introducing
 //! a separate public API surface.
 
-use crate::forms::{expression::Expression, term::Term, variable::Variable};
+use num::{Integer, Rational64};
+
+use crate::forms::{
+    expression::Expression, rational_expression::RationalExpression, term::Term, variable::Variable,
+};
 use crate::impl_commutative_op;
 use std::ops::{Div, Sub};
 
@@ -13,6 +17,8 @@ impl_commutative_op!(Add::add, +, i64, Term, Expression);
 impl_commutative_op!(Mul::mul, *, i64, Term, Term);
 impl_commutative_op!(Add::add, +, i64, Expression, Expression);
 impl_commutative_op!(Mul::mul, *, i64, Expression, Expression);
+impl_commutative_op!(Add::add, +, i64, RationalExpression, RationalExpression);
+impl_commutative_op!(Mul::mul, *, i64, RationalExpression, RationalExpression);
 
 impl Sub<Variable> for i64 {
     type Output = Expression;
@@ -54,6 +60,13 @@ impl Sub<Expression> for i64 {
     }
 }
 
+/// Computes the least common multiple of two rational numbers.
+pub fn rational_lcm(x: &Rational64, y: &Rational64) -> Rational64 {
+    let num = x.numer().lcm(y.numer());
+    let den = x.denom().gcd(y.denom());
+    Rational64::new(num, den)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -88,5 +101,19 @@ mod tests {
         assert_eq!(sub_term.to_string(), "3 - x²");
         assert_eq!(div_term.to_string(), "3x⁻²");
         assert_eq!(sub_expression.to_string(), "3 - x - y");
+    }
+
+    #[test]
+    fn test_rational_lcm() {
+        let a = Rational64::new(2, 7);
+        let b = Rational64::new(3, 14);
+        let c = Rational64::new(5, 3);
+        let lcm = rational_lcm(&rational_lcm(&a, &b), &c);
+        assert_eq!(lcm, Rational64::new(30, 1));
+
+        let b = Rational64::new(3, 4);
+        let c = Rational64::new(3, 2);
+        let lcm = rational_lcm(&b, &c);
+        assert_eq!(lcm, Rational64::new(3, 2));
     }
 }

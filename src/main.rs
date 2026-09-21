@@ -1,5 +1,5 @@
-use tiny_symbolic::Variable;
 use tiny_symbolic::algos::ElementarySymmetricPolynomials;
+use tiny_symbolic::*;
 
 fn main() {
     let x = Variable::new('x', None);
@@ -32,4 +32,10 @@ fn main() {
     let expr_as_esp = esp_engine.simplify_symmetric_expression(substituted);
 
     println!("{expr_as_esp}"); //Will output -3e₁e₂ + e₁³
+
+    let x = Variable::new('x', None);
+    let poly = Polynomial::new(x, vec![1, -2, 1]);
+
+    println!("{}", poly); // x² - 2x + 1
+    println!("{}", poly.compute_nth_derivative(1));
 }
