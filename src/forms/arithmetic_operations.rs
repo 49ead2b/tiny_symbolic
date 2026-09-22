@@ -217,8 +217,26 @@ mod assignment_operations {
         }
     }
 
+    impl<T> AddAssign<T> for RationalExpression
+    where
+        T: Into<Expression>,
+    {
+        fn add_assign(&mut self, rhs: T) {
+            *self = self.clone() + rhs;
+        }
+    }
+
     impl SubAssign for RationalExpression {
         fn sub_assign(&mut self, rhs: Self) {
+            *self = self.clone() - rhs;
+        }
+    }
+
+    impl<T> SubAssign<T> for RationalExpression
+    where
+        T: Into<Expression>,
+    {
+        fn sub_assign(&mut self, rhs: T) {
             *self = self.clone() - rhs;
         }
     }
@@ -229,9 +247,45 @@ mod assignment_operations {
         }
     }
 
+    impl<T> MulAssign<T> for RationalExpression
+    where
+        T: Into<Expression>,
+    {
+        fn mul_assign(&mut self, rhs: T) {
+            *self = self.clone() * rhs;
+        }
+    }
+
     impl DivAssign for RationalExpression {
         fn div_assign(&mut self, rhs: Self) {
             *self = self.clone() / rhs;
+        }
+    }
+
+    impl<T> DivAssign<T> for RationalExpression
+    where
+        T: Into<Expression>,
+    {
+        fn div_assign(&mut self, rhs: T) {
+            *self = self.clone() / rhs;
+        }
+    }
+
+    impl AddAssign for Polynomial {
+        fn add_assign(&mut self, rhs: Self) {
+            *self = self.clone() + rhs;
+        }
+    }
+
+    impl SubAssign for Polynomial {
+        fn sub_assign(&mut self, rhs: Self) {
+            *self = self.clone() - rhs;
+        }
+    }
+
+    impl MulAssign for Polynomial {
+        fn mul_assign(&mut self, rhs: Self) {
+            *self = self.clone() * rhs;
         }
     }
 
@@ -247,7 +301,7 @@ mod assignment_operations {
             let term = Term::from(x) * scalar;
             let expression = Expression::from(term.clone()) + y;
             let rational = RationalExpression::from(expression.clone());
-            // let polynomial = Polynomial::new(x, vec![1, 1]);
+            let polynomial = Polynomial::new(x, vec![1, 1]);
 
             let mut term_assign = term.clone();
             term_assign *= scalar;
@@ -272,13 +326,35 @@ mod assignment_operations {
             expression_assign -= expression.clone();
             expression_assign /= scalar;
             expression_assign /= x;
-            expression_assign /= term;
+            expression_assign /= term.clone();
 
             let mut rational_assign = rational.clone();
             rational_assign += rational.clone();
             rational_assign -= rational.clone();
             rational_assign *= rational.clone();
             rational_assign /= rational;
+
+            rational_assign += scalar;
+            rational_assign += x;
+            rational_assign += term.clone();
+            rational_assign += expression.clone();
+            rational_assign -= scalar;
+            rational_assign -= x;
+            rational_assign -= term.clone();
+            rational_assign -= expression.clone();
+            rational_assign *= scalar;
+            rational_assign *= x;
+            rational_assign *= term.clone();
+            rational_assign *= expression.clone();
+            rational_assign /= scalar;
+            rational_assign /= x;
+            rational_assign /= term;
+            rational_assign /= expression;
+
+            let mut polynomial_assign = polynomial.clone();
+            polynomial_assign += polynomial.clone();
+            polynomial_assign -= polynomial.clone();
+            polynomial_assign *= polynomial;
         }
     }
 }
@@ -317,6 +393,14 @@ mod binary_operations {
 
     impl_commutative_op!(Add::add, +, Variable, Term, Expression);
 
+    impl Add<Expression> for Variable {
+        type Output = Expression;
+
+        fn add(self, rhs: Expression) -> Self::Output {
+            Term::from(self) + rhs
+        }
+    }
+
     impl_commutative_op!(Add::add, +, Variable, RationalExpression, RationalExpression);
 
     impl<T> Sub<T> for Variable
@@ -342,6 +426,14 @@ mod binary_operations {
         type Output = Expression;
 
         fn sub(self, rhs: Term) -> Self::Output {
+            Term::from(self) - rhs
+        }
+    }
+
+    impl Sub<Expression> for Variable {
+        type Output = Expression;
+
+        fn sub(self, rhs: Expression) -> Self::Output {
             Term::from(self) - rhs
         }
     }
@@ -403,6 +495,14 @@ mod binary_operations {
 
         fn div(self, rhs: Term) -> Self::Output {
             Term::from(self) / rhs
+        }
+    }
+
+    impl Div<Expression> for Variable {
+        type Output = RationalExpression;
+
+        fn div(self, rhs: Expression) -> Self::Output {
+            RationalExpression::from(self) / RationalExpression::from(rhs)
         }
     }
 
@@ -558,6 +658,14 @@ mod binary_operations {
         fn div(mut self, rhs: Self) -> Self::Output {
             self /= rhs;
             self
+        }
+    }
+
+    impl Div<Expression> for Term {
+        type Output = RationalExpression;
+
+        fn div(self, rhs: Expression) -> Self::Output {
+            RationalExpression::new(self.into(), rhs)
         }
     }
 
@@ -949,117 +1057,93 @@ mod binary_operations {
         }
     }
 
-    impl_commutative_op!(Add::add, +, TermMultiplierType, Variable, Expression);
+    macro_rules! implement_traits_on_numeric_types
+    {
+        ($t:ty) => {
+            impl_commutative_op!(Add::add, +, $t, Variable, Expression);
 
-    impl_commutative_op!(Mul::mul, *, TermMultiplierType, Variable, Term);
+            impl_commutative_op!(Add::add, +, $t, Term, Expression);
 
-    impl Sub<Variable> for TermMultiplierType {
-        type Output = Expression;
+            impl_commutative_op!(Add::add, +, $t, Expression, Expression);
 
-        fn sub(self, rhs: Variable) -> Self::Output {
-            Term::from(self) - Term::from(rhs)
+            impl_commutative_op!(Add::add, +, $t, RationalExpression, RationalExpression);
+
+            impl Sub<Variable> for $t {
+                type Output = Expression;
+
+                fn sub(self, rhs: Variable) -> Self::Output {
+                    Term::from(self) - Term::from(rhs)
+                }
+            }
+
+            impl Sub<Term> for $t {
+                type Output = Expression;
+
+                fn sub(self, rhs: Term) -> Self::Output {
+                    Term::from(self) - rhs
+                }
+            }
+
+            impl Sub<Expression> for $t {
+                type Output = Expression;
+
+                fn sub(self, rhs: Expression) -> Self::Output {
+                    Expression::from(self) - rhs
+                }
+            }
+
+            impl Sub<RationalExpression> for $t {
+                type Output = RationalExpression;
+
+                fn sub(self, rhs: RationalExpression) -> Self::Output {
+                    -(rhs - self)
+                }
+            }
+
+            impl_commutative_op!(Mul::mul, *, $t, Variable, Term);
+
+            impl_commutative_op!(Mul::mul, *, $t, Term, Term);
+
+            impl_commutative_op!(Mul::mul, *, $t, Expression, Expression);
+
+            impl_commutative_op!(Mul::mul, *, $t, RationalExpression, RationalExpression);
+
+            impl Div<Variable> for $t {
+                type Output = Term;
+
+                fn div(self, rhs: Variable) -> Self::Output {
+                    Term::from(self) / Term::from(rhs)
+                }
+            }
+
+            impl Div<Term> for $t {
+                type Output = Term;
+
+                fn div(self, rhs: Term) -> Self::Output {
+                    Term::from(self) / rhs
+                }
+            }
+
+            impl Div<Expression> for $t {
+                type Output = RationalExpression;
+
+                fn div(self, rhs: Expression) -> Self::Output {
+                    RationalExpression::from(self) / RationalExpression::from(rhs)
+                }
+            }
+
+            impl Div<RationalExpression> for $t {
+                type Output = RationalExpression;
+
+                fn div(self, rhs: RationalExpression) -> Self::Output {
+                    (rhs / self).inverse()
+                }
+            }
         }
     }
 
-    impl Div<Variable> for TermMultiplierType {
-        type Output = Term;
-
-        fn div(self, rhs: Variable) -> Self::Output {
-            Term::from(self) / Term::from(rhs)
-        }
-    }
-
-    impl_commutative_op!(Add::add, +, TermMultiplierType, Term, Expression);
-
-    impl_commutative_op!(Mul::mul, *, TermMultiplierType, Term, Term);
-
-    impl Sub<Term> for TermMultiplierType {
-        type Output = Expression;
-
-        fn sub(self, rhs: Term) -> Self::Output {
-            Term::from(self) - rhs
-        }
-    }
-
-    impl Div<Term> for TermMultiplierType {
-        type Output = Term;
-
-        fn div(self, rhs: Term) -> Self::Output {
-            Term::from(self) / rhs
-        }
-    }
-
-    impl_commutative_op!(Add::add, +, TermMultiplierType, Expression, Expression);
-
-    impl_commutative_op!(Mul::mul, *, TermMultiplierType, Expression, Expression);
-
-    impl Sub<Expression> for TermMultiplierType {
-        type Output = Expression;
-
-        fn sub(self, rhs: Expression) -> Self::Output {
-            Expression::from(self) - rhs
-        }
-    }
-
-    impl_commutative_op!(Add::add, +, TermMultiplierType, RationalExpression, RationalExpression);
-
-    impl_commutative_op!(Mul::mul, *, TermMultiplierType, RationalExpression, RationalExpression);
-
-    impl_commutative_op!(Add::add, +, TermVariablePowerType, Variable, Expression);
-
-    impl_commutative_op!(Mul::mul, *, TermVariablePowerType, Variable, Term);
-
-    impl_commutative_op!(Add::add, +, TermVariablePowerType, Term, Expression);
-
-    impl_commutative_op!(Mul::mul, *, TermVariablePowerType, Term, Term);
-
-    impl_commutative_op!(Add::add, +, TermVariablePowerType, Expression, Expression);
-
-    impl_commutative_op!(Mul::mul, *, TermVariablePowerType, Expression, Expression);
-
-    impl_commutative_op!(Add::add, +, TermVariablePowerType, RationalExpression, RationalExpression);
-
-    impl_commutative_op!(Mul::mul, *, TermVariablePowerType, RationalExpression, RationalExpression);
-
-    impl Sub<Variable> for TermVariablePowerType {
-        type Output = Expression;
-
-        fn sub(self, rhs: Variable) -> Self::Output {
-            Term::from(self) - rhs
-        }
-    }
-
-    impl Div<Variable> for TermVariablePowerType {
-        type Output = Term;
-
-        fn div(self, rhs: Variable) -> Self::Output {
-            Term::from(self) / rhs
-        }
-    }
-
-    impl Sub<Term> for TermVariablePowerType {
-        type Output = Expression;
-
-        fn sub(self, rhs: Term) -> Self::Output {
-            Term::from(self) - rhs
-        }
-    }
-
-    impl Div<Term> for TermVariablePowerType {
-        type Output = Term;
-
-        fn div(self, rhs: Term) -> Self::Output {
-            Term::from(self) / rhs
-        }
-    }
-
-    impl Sub<Expression> for TermVariablePowerType {
-        type Output = Expression;
-
-        fn sub(self, rhs: Expression) -> Self::Output {
-            Expression::from(self) - rhs
-        }
-    }
+    implement_traits_on_numeric_types!(TermMultiplierType);
+    implement_traits_on_numeric_types!(i64);
 
     #[cfg(test)]
     mod binary_operations_tests {
@@ -1070,19 +1154,21 @@ mod binary_operations {
             let x = Variable::new('x', None);
             let y = Variable::new('y', None);
             let scalar = TermMultiplierType::new(2, 1);
-            let term = Term::from(x) * scalar;
+            let term = Term::from(y).pow(2) * Term::from(x) * scalar;
             let expression = Expression::from(term.clone()) + y;
-            let rational = RationalExpression::from(expression.clone());
+            let rational = RationalExpression::new(expression.clone(), 1 + expression.clone());
             let polynomial = Polynomial::new(x, vec![1, 1]);
 
             let _ = -x;
             let _ = x + scalar;
             let _ = x + y;
             let _ = x + term.clone();
+            let _ = x + expression.clone();
             let _ = x + rational.clone();
             let _ = x - scalar;
             let _ = x - y;
             let _ = x - term.clone();
+            let _ = x - expression.clone();
             let _ = x - rational.clone();
             let _ = x * scalar;
             let _ = x * y;
@@ -1092,6 +1178,7 @@ mod binary_operations {
             let _ = x / scalar;
             let _ = x / y;
             let _ = x / term.clone();
+            let _ = x / expression.clone();
             let _ = x / rational.clone();
 
             let _ = -term.clone();
@@ -1113,6 +1200,7 @@ mod binary_operations {
             let _ = term.clone() / scalar;
             let _ = term.clone() / x;
             let _ = term.clone() / term.clone();
+            let _ = term.clone() / expression.clone();
             let _ = term.clone() / rational.clone();
 
             let _ = -expression.clone();
@@ -1163,6 +1251,49 @@ mod binary_operations {
             let _ = polynomial.clone() - polynomial.clone();
             let _ = polynomial.clone() * polynomial.clone();
             let _ = polynomial.clone() / polynomial.clone();
+
+            let _ = -scalar;
+            let _ = scalar + scalar;
+            let _ = scalar + y;
+            let _ = scalar + term.clone();
+            let _ = scalar + expression.clone();
+            let _ = scalar + rational.clone();
+            let _ = scalar - scalar;
+            let _ = scalar - y;
+            let _ = scalar - term.clone();
+            let _ = scalar - expression.clone();
+            let _ = scalar - rational.clone();
+            let _ = scalar * scalar;
+            let _ = scalar * y;
+            let _ = scalar * term.clone();
+            let _ = scalar * expression.clone();
+            let _ = scalar * rational.clone();
+            let _ = scalar / scalar;
+            let _ = scalar / y;
+            let _ = scalar / term.clone();
+            let _ = scalar / expression.clone();
+            let _ = scalar / rational.clone();
+
+            // let _ = 5 + scalar;
+            let _ = 5 + y;
+            let _ = 5 + term.clone();
+            let _ = 5 + expression.clone();
+            let _ = 5 + rational.clone();
+            // let _ = 5 - scalar;
+            let _ = 5 - y;
+            let _ = 5 - term.clone();
+            let _ = 5 - expression.clone();
+            let _ = 5 - rational.clone();
+            // let _ = 5 * scalar;
+            let _ = 5 * y;
+            let _ = 5 * term.clone();
+            let _ = 5 * expression.clone();
+            let _ = 5 * rational.clone();
+            // let _ = 5 / scalar;
+            let _ = 5 / y;
+            let _ = 5 / term.clone();
+            let _ = 5 / expression.clone();
+            let _ = 5 / rational.clone();
         }
     }
 }
