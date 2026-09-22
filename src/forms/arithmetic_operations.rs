@@ -234,6 +234,53 @@ mod assignment_operations {
             *self = self.clone() / rhs;
         }
     }
+
+    #[cfg(test)]
+    mod assignment_operations_tests {
+        use super::*;
+
+        #[test]
+        fn test_all_arithmetic_combinations() {
+            let x = Variable::new('x', None);
+            let y = Variable::new('y', None);
+            let scalar = TermMultiplierType::new(2, 1);
+            let term = Term::from(x) * scalar;
+            let expression = Expression::from(term.clone()) + y;
+            let rational = RationalExpression::from(expression.clone());
+            // let polynomial = Polynomial::new(x, vec![1, 1]);
+
+            let mut term_assign = term.clone();
+            term_assign *= scalar;
+            term_assign *= x;
+            term_assign *= term.clone();
+            term_assign /= scalar;
+            term_assign /= x;
+            term_assign /= term.clone();
+
+            let mut expression_assign = expression.clone();
+            expression_assign += scalar;
+            expression_assign += x;
+            expression_assign += term.clone();
+            expression_assign += expression.clone();
+            expression_assign *= scalar;
+            expression_assign *= x;
+            expression_assign *= term.clone();
+            expression_assign *= expression.clone();
+            expression_assign -= scalar;
+            expression_assign -= x;
+            expression_assign -= term.clone();
+            expression_assign -= expression.clone();
+            expression_assign /= scalar;
+            expression_assign /= x;
+            expression_assign /= term;
+
+            let mut rational_assign = rational.clone();
+            rational_assign += rational.clone();
+            rational_assign -= rational.clone();
+            rational_assign *= rational.clone();
+            rational_assign /= rational;
+        }
+    }
 }
 
 mod binary_operations {
@@ -837,6 +884,9 @@ mod binary_operations {
                 new_coefficients[i] += coeff;
             }
 
+            while new_coefficients.last().is_some_and(|c| c.is_zero()) {
+                new_coefficients.pop();
+            }
             Polynomial::new(self.variable, new_coefficients)
         }
     }
@@ -860,6 +910,9 @@ mod binary_operations {
                 new_coefficients[i] -= coeff;
             }
 
+            while new_coefficients.last().is_some_and(|c| c.is_zero()) {
+                new_coefficients.pop();
+            }
             Polynomial::new(self.variable, new_coefficients)
         }
     }
@@ -1005,6 +1058,111 @@ mod binary_operations {
 
         fn sub(self, rhs: Expression) -> Self::Output {
             Expression::from(self) - rhs
+        }
+    }
+
+    #[cfg(test)]
+    mod binary_operations_tests {
+        use super::*;
+
+        #[test]
+        fn test_all_arithmetic_combinations() {
+            let x = Variable::new('x', None);
+            let y = Variable::new('y', None);
+            let scalar = TermMultiplierType::new(2, 1);
+            let term = Term::from(x) * scalar;
+            let expression = Expression::from(term.clone()) + y;
+            let rational = RationalExpression::from(expression.clone());
+            let polynomial = Polynomial::new(x, vec![1, 1]);
+
+            let _ = -x;
+            let _ = x + scalar;
+            let _ = x + y;
+            let _ = x + term.clone();
+            let _ = x + rational.clone();
+            let _ = x - scalar;
+            let _ = x - y;
+            let _ = x - term.clone();
+            let _ = x - rational.clone();
+            let _ = x * scalar;
+            let _ = x * y;
+            let _ = x * term.clone();
+            let _ = x * expression.clone();
+            let _ = x * rational.clone();
+            let _ = x / scalar;
+            let _ = x / y;
+            let _ = x / term.clone();
+            let _ = x / rational.clone();
+
+            let _ = -term.clone();
+            let _ = term.clone() + scalar;
+            let _ = term.clone() + x;
+            let _ = term.clone() + term.clone();
+            let _ = term.clone() + expression.clone();
+            let _ = term.clone() + rational.clone();
+            let _ = term.clone() - scalar;
+            let _ = term.clone() - x;
+            let _ = term.clone() - term.clone();
+            let _ = term.clone() - expression.clone();
+            let _ = term.clone() - rational.clone();
+            let _ = term.clone() * scalar;
+            let _ = term.clone() * x;
+            let _ = term.clone() * term.clone();
+            let _ = term.clone() * expression.clone();
+            let _ = term.clone() * rational.clone();
+            let _ = term.clone() / scalar;
+            let _ = term.clone() / x;
+            let _ = term.clone() / term.clone();
+            let _ = term.clone() / rational.clone();
+
+            let _ = -expression.clone();
+            let _ = expression.clone() + scalar;
+            let _ = expression.clone() + x;
+            let _ = expression.clone() + term.clone();
+            let _ = expression.clone() + expression.clone();
+            let _ = expression.clone() + rational.clone();
+            let _ = expression.clone() - scalar;
+            let _ = expression.clone() - x;
+            let _ = expression.clone() - term.clone();
+            let _ = expression.clone() - expression.clone();
+            let _ = expression.clone() - rational.clone();
+            let _ = expression.clone() * scalar;
+            let _ = expression.clone() * x;
+            let _ = expression.clone() * term.clone();
+            let _ = expression.clone() * expression.clone();
+            let _ = expression.clone() * rational.clone();
+            let _ = expression.clone() / scalar;
+            let _ = expression.clone() / x;
+            let _ = expression.clone() / term.clone();
+            let _ = expression.clone() / expression.clone();
+            let _ = expression.clone() / rational.clone();
+
+            let _ = -rational.clone();
+            let _ = rational.clone() + scalar;
+            let _ = rational.clone() + x;
+            let _ = rational.clone() + term.clone();
+            let _ = rational.clone() + expression.clone();
+            let _ = rational.clone() + rational.clone();
+            let _ = rational.clone() - scalar;
+            let _ = rational.clone() - x;
+            let _ = rational.clone() - term.clone();
+            let _ = rational.clone() - expression.clone();
+            let _ = rational.clone() - rational.clone();
+            let _ = rational.clone() * scalar;
+            let _ = rational.clone() * x;
+            let _ = rational.clone() * term.clone();
+            let _ = rational.clone() * expression.clone();
+            let _ = rational.clone() * rational.clone();
+            let _ = rational.clone() / scalar;
+            let _ = rational.clone() / x;
+            let _ = rational.clone() / term.clone();
+            let _ = rational.clone() / expression.clone();
+            let _ = rational.clone() / rational.clone();
+
+            let _ = polynomial.clone() + polynomial.clone();
+            let _ = polynomial.clone() - polynomial.clone();
+            let _ = polynomial.clone() * polynomial.clone();
+            let _ = polynomial.clone() / polynomial.clone();
         }
     }
 }
