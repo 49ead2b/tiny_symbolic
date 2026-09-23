@@ -16,3 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Export ElementarySymmetricPolynomials under algos instead of crate root.
+
+## [0.3.0] - 2026-09-23
+
+### Changed
+- Add RationalExpression and Polynomial data structure.
+- More checks for undefined operations.
+- Support all arithmetic combinations of Variable, Term, Expression, RationalExpression
