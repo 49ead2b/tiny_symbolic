@@ -5,7 +5,10 @@ use std::{
 
 use itertools::Itertools;
 
-use crate::forms::{expression::Expression, term::Term, variable::Variable};
+use crate::{
+    TermVariablePowerType,
+    forms::{expression::Expression, term::Term, variable::Variable},
+};
 
 /// A small symbolic engine for rewriting symmetric expressions using elementary symmetric
 /// polynomials.
@@ -19,7 +22,7 @@ pub struct ElementarySymmetricPolynomials {
     elementary_polynomial_representations: HashMap<usize, Expression>,
     elementary_polynomial_substitutions: HashMap<usize, Expression>,
     variables: HashSet<Variable>,
-    cache_power_sums: HashMap<Vec<i32>, Expression>,
+    cache_power_sums: HashMap<Vec<TermVariablePowerType>, Expression>,
 }
 
 impl ElementarySymmetricPolynomials {
@@ -38,8 +41,10 @@ impl ElementarySymmetricPolynomials {
         };
 
         // Seed the recursive cache with the simplest base cases.
-        obj.cache_power_sums
-            .insert(vec![0], (obj.variables.len() as i64).into());
+        obj.cache_power_sums.insert(
+            vec![0],
+            (obj.variables.len() as TermVariablePowerType).into(),
+        );
         if obj.variable_count() >= 1 {
             obj.cache_power_sums
                 .insert(vec![1], Variable::new('e', Some(1)).into());
@@ -117,7 +122,9 @@ impl ElementarySymmetricPolynomials {
         self.variables.contains(variable)
     }
 
-    fn count_occurrences(values: &[i32]) -> HashMap<i32, usize> {
+    fn count_occurrences(
+        values: &[TermVariablePowerType],
+    ) -> HashMap<TermVariablePowerType, usize> {
         let mut counts = HashMap::new();
         for value in values {
             *counts.entry(*value).or_insert(0) += 1;
@@ -133,7 +140,7 @@ impl ElementarySymmetricPolynomials {
     ///
     /// If the pattern contains repeated exponents, the sum must be divided by the product of
     /// the factorials of those repetitions to avoid overcounting.
-    fn symmetry_factor_for_pattern(&self, pattern: &[i32]) -> usize {
+    fn symmetry_factor_for_pattern(&self, pattern: &[TermVariablePowerType]) -> usize {
         Self::count_occurrences(pattern)
             .values()
             .map(|count| Self::factorial(*count))
@@ -142,8 +149,8 @@ impl ElementarySymmetricPolynomials {
 
     /// Build a normalized symmetric sum for a given exponent pattern.
     #[allow(dead_code)]
-    fn generate_symmetric_expression(&self, powers: &[i32]) -> Expression {
-        let common_factor = self.symmetry_factor_for_pattern(powers) as i64;
+    fn generate_symmetric_expression(&self, powers: &[TermVariablePowerType]) -> Expression {
+        let common_factor = self.symmetry_factor_for_pattern(powers) as TermVariablePowerType;
         let number_of_slots = powers.len();
         self.variables
             .iter()
@@ -161,7 +168,7 @@ impl ElementarySymmetricPolynomials {
     }
 
     /// Extract the exponent pattern of a term, keeping only the variables in this system.
-    fn power_pattern_for_term(&self, term: &Term) -> Vec<i32> {
+    fn power_pattern_for_term(&self, term: &Term) -> Vec<TermVariablePowerType> {
         term.variables()
             .iter()
             .filter(|(variable, _)| self.variables.contains(*variable))
@@ -175,7 +182,7 @@ impl ElementarySymmetricPolynomials {
     fn partition_into_symmetric_expression(
         &self,
         input: &Expression,
-    ) -> HashMap<Vec<i32>, Expression> {
+    ) -> HashMap<Vec<TermVariablePowerType>, Expression> {
         let coefficient_groups = self.group_terms_by_power_pattern(input);
         if !self.is_valid_symmetric_pattern_map(&coefficient_groups) {
             panic!("Not a symmetric expression!");
@@ -194,8 +201,9 @@ impl ElementarySymmetricPolynomials {
     fn group_terms_by_power_pattern(
         &self,
         input: &Expression,
-    ) -> HashMap<Vec<i32>, HashMap<Term, usize>> {
-        let mut groups: HashMap<Vec<i32>, HashMap<Term, usize>> = HashMap::default();
+    ) -> HashMap<Vec<TermVariablePowerType>, HashMap<Term, usize>> {
+        let mut groups: HashMap<Vec<TermVariablePowerType>, HashMap<Term, usize>> =
+            HashMap::default();
 
         for mut term in input.terms() {
             let pattern = self.power_pattern_for_term(&term);
@@ -217,7 +225,7 @@ impl ElementarySymmetricPolynomials {
     /// Check whether the grouping respects the expected multiplicities of a symmetric expression.
     fn is_valid_symmetric_pattern_map(
         &self,
-        groups: &HashMap<Vec<i32>, HashMap<Term, usize>>,
+        groups: &HashMap<Vec<TermVariablePowerType>, HashMap<Term, usize>>,
     ) -> bool {
         for (pattern, terms) in groups.iter() {
             let total_permutations = Self::factorial(self.variable_count())
@@ -241,29 +249,29 @@ impl ElementarySymmetricPolynomials {
         self.is_valid_symmetric_pattern_map(&groups)
     }
 
-    fn minus_1_pow(k: i32) -> i64 {
+    fn minus_1_pow(k: TermVariablePowerType) -> TermVariablePowerType {
         if k % 2 == 0 { 1 } else { -1 }
     }
 
-    fn ek_as_variable_expression(&self, k: i32) -> Expression {
+    fn ek_as_variable_expression(&self, k: TermVariablePowerType) -> Expression {
         if k == 0 {
             1.into()
         } else if k as usize <= self.variable_count() {
-            Variable::new('e', Some(k.into())).into()
+            Variable::new('e', Some(k)).into()
         } else {
             0.into()
         }
     }
 
     /// Recursively compute the power sums using the Newton-Girard recurrence.
-    fn get_sk_using_newton_girard_formula(&mut self, k: i32) -> Expression {
+    fn get_sk_using_newton_girard_formula(&mut self, k: TermVariablePowerType) -> Expression {
         let cache_key = vec![k];
         if let Some(cached_value) = self.cache_power_sums.get(&cache_key) {
             return cached_value.clone();
         }
 
         let sign_for_k = Self::minus_1_pow(k - 1);
-        let mut output = sign_for_k * (k as i64) * self.ek_as_variable_expression(k);
+        let mut output = sign_for_k * k * self.ek_as_variable_expression(k);
 
         for i in 1..k {
             let sign_for_i = Self::minus_1_pow(i - 1);
@@ -276,7 +284,7 @@ impl ElementarySymmetricPolynomials {
     }
 
     /// Rewrite a power pattern into an expression built from elementary symmetric polynomials.
-    fn expression_for_power_pattern(&mut self, pattern: &[i32]) -> Expression {
+    fn expression_for_power_pattern(&mut self, pattern: &[TermVariablePowerType]) -> Expression {
         let normalized_pattern = pattern.iter().copied().sorted().rev().collect::<Vec<_>>();
 
         if normalized_pattern.is_empty() {
@@ -286,8 +294,8 @@ impl ElementarySymmetricPolynomials {
         } else if normalized_pattern.first() == normalized_pattern.last()
             && *normalized_pattern.first().unwrap() == 1
         {
-            (Self::factorial(normalized_pattern.len()) as i64)
-                * self.ek_as_variable_expression(normalized_pattern.len() as i32)
+            (Self::factorial(normalized_pattern.len()) as TermVariablePowerType)
+                * self.ek_as_variable_expression(normalized_pattern.len() as TermVariablePowerType)
         } else {
             let split_index = normalized_pattern.len() - 1;
             let left_pattern = &normalized_pattern[..split_index];
@@ -306,7 +314,7 @@ impl ElementarySymmetricPolynomials {
         }
     }
 
-    fn get_min_power_in_expression(&self, input: &Expression) -> i32 {
+    fn get_min_power_in_expression(&self, input: &Expression) -> TermVariablePowerType {
         input
             .terms()
             .into_iter()
@@ -325,7 +333,8 @@ impl ElementarySymmetricPolynomials {
     pub fn simplify_symmetric_expression(&mut self, mut input: Expression) -> Expression {
         let min_power = self.get_min_power_in_expression(&input);
         if min_power < 0 {
-            let denominator = self.ek_as_variable_expression(self.variable_count() as i32);
+            let denominator =
+                self.ek_as_variable_expression(self.variable_count() as TermVariablePowerType);
             let numerator = self
                 .variables()
                 .map(|variable| variable.pow(-min_power))
@@ -336,7 +345,8 @@ impl ElementarySymmetricPolynomials {
         let mut output = Expression::default();
 
         for (pattern, multiplier) in partitions {
-            let symmetry_factor = self.symmetry_factor_for_pattern(&pattern) as i64;
+            let symmetry_factor =
+                self.symmetry_factor_for_pattern(&pattern) as TermVariablePowerType;
             let pattern_expression = self.expression_for_power_pattern(&pattern);
             output += multiplier * pattern_expression / symmetry_factor;
         }
@@ -355,7 +365,7 @@ impl ElementarySymmetricPolynomials {
 
 #[cfg(test)]
 mod tests {
-    use num::Rational64;
+    use crate::TermMultiplierType;
 
     use super::*;
     use crate::forms::variable::Variable;
@@ -445,7 +455,7 @@ mod tests {
 
         assert_eq!(expected.to_string(), actual.to_string());
 
-        let f_z = Term::from(Rational64::new(2, 3));
+        let f_z = Term::from(TermMultiplierType::new(2, 3));
 
         let actual = esp.simplify_symmetric_expression(f_z.clone().into());
 
@@ -461,7 +471,7 @@ mod tests {
             Variable::new('D', None),
         );
         let f_z = 4 * (a + b + c + d).pow(20)
-            + Rational64::new(7, 8)
+            + TermMultiplierType::new(7, 8)
                 * (a + b + c + d).pow(5)
                 * (a * b + a * c + a * d + b * c + b * d + c * d).pow(3);
 
@@ -477,7 +487,7 @@ mod tests {
         esp.set_ek_substitution_as(4, p4.into());
 
         let actual = esp.simplify_symmetric_expression(f_z);
-        let expected = 4 * p1.pow(20) + Rational64::new(7, 8) * p1.pow(5) * p2.pow(3);
+        let expected = 4 * p1.pow(20) + TermMultiplierType::new(7, 8) * p1.pow(5) * p2.pow(3);
 
         assert_eq!(actual, expected);
 
@@ -507,7 +517,7 @@ mod tests {
 
         let m = Variable::new('m', None);
 
-        let f_z = Rational64::new(4, 3) * e1.pow(3) * e2.pow(2) * e3.pow(3) * e4.pow(4) + m;
+        let f_z = TermMultiplierType::new(4, 3) * e1.pow(3) * e2.pow(2) * e3.pow(3) * e4.pow(4) + m;
 
         let mut esp = ElementarySymmetricPolynomials::from_variables(&vec![a, b, c, d]);
         esp.set_ek_substitution_as(1, Variable::new('p', Some(1)).into());
@@ -516,7 +526,7 @@ mod tests {
         esp.set_ek_substitution_as(4, Variable::new('p', Some(4)).into());
 
         let actual = esp.simplify_symmetric_expression(f_z);
-        let expected = Rational64::new(4, 3)
+        let expected = TermMultiplierType::new(4, 3)
             * Variable::new('p', Some(1)).pow(3)
             * Variable::new('p', Some(2)).pow(2)
             * Variable::new('p', Some(3)).pow(3)

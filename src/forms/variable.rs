@@ -1,16 +1,8 @@
-use std::{
-    fmt::Display,
-    ops::{Add, Div, Mul, Neg, Sub},
-};
+use std::fmt::Display;
 
 use fmtastic::Subscript;
-use num::Rational64;
 
-use crate::{
-    RationalExpression,
-    forms::{expression::Expression, term::Term},
-    impl_commutative_op,
-};
+use crate::*;
 
 /// A symbolic variable identified by a name and optional subscript.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -26,7 +18,7 @@ impl Variable {
     }
 
     /// Raises the variable to the given integer power.
-    pub fn pow(self, power: i32) -> Term {
+    pub fn pow(self, power: TermVariablePowerType) -> Term {
         Term::from(self).pow(power)
     }
 
@@ -54,147 +46,10 @@ impl Display for Variable {
     }
 }
 
-impl Neg for Variable {
-    type Output = Term;
-
-    fn neg(self) -> Self::Output {
-        -Term::from(self)
-    }
-}
-
-impl Add for Variable {
-    type Output = Expression;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Term::from(self) + Term::from(rhs)
-    }
-}
-
-impl Mul for Variable {
-    type Output = Term;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        Term::from(self) * Term::from(rhs)
-    }
-}
-
-impl Sub for Variable {
-    type Output = Expression;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Term::from(self) - Term::from(rhs)
-    }
-}
-
-impl Div for Variable {
-    type Output = Term;
-
-    fn div(self, rhs: Self) -> Self::Output {
-        Term::from(self) / Term::from(rhs)
-    }
-}
-
-impl_commutative_op!(Add::add, +, Variable, Term, Expression);
-
-impl_commutative_op!(Mul::mul, *, Variable, Term, Term);
-
-impl Sub<Term> for Variable {
-    type Output = Expression;
-
-    fn sub(self, rhs: Term) -> Self::Output {
-        Term::from(self) - rhs
-    }
-}
-
-impl Div<Term> for Variable {
-    type Output = Term;
-
-    fn div(self, rhs: Term) -> Self::Output {
-        Term::from(self) / rhs
-    }
-}
-
-impl<T> Add<T> for Variable
-where
-    T: Into<Rational64>,
-{
-    type Output = Expression;
-
-    fn add(self, rhs: T) -> Self::Output {
-        Term::from(self) + Term::from(rhs)
-    }
-}
-
-impl<T> Mul<T> for Variable
-where
-    T: Into<Rational64>,
-{
-    type Output = Term;
-
-    fn mul(self, rhs: T) -> Self::Output {
-        Term::from(self) * Term::from(rhs)
-    }
-}
-
-impl<T> Sub<T> for Variable
-where
-    T: Into<Rational64>,
-{
-    type Output = Expression;
-
-    fn sub(self, rhs: T) -> Self::Output {
-        Term::from(self) - Term::from(rhs)
-    }
-}
-
-impl<T> Div<T> for Variable
-where
-    T: Into<Rational64>,
-{
-    type Output = Term;
-
-    fn div(self, rhs: T) -> Self::Output {
-        Term::from(self) / Term::from(rhs)
-    }
-}
-
-impl_commutative_op!(Add::add, +, Rational64, Variable, Expression);
-
-impl_commutative_op!(Mul::mul, *, Rational64, Variable, Term);
-
-impl Sub<RationalExpression> for Variable {
-    type Output = RationalExpression;
-
-    fn sub(self, rhs: RationalExpression) -> Self::Output {
-        -(rhs - self)
-    }
-}
-
-impl Div<RationalExpression> for Variable {
-    type Output = RationalExpression;
-
-    fn div(self, rhs: RationalExpression) -> Self::Output {
-        (rhs / self).inverse()
-    }
-}
-
-impl Sub<Variable> for Rational64 {
-    type Output = Expression;
-
-    fn sub(self, rhs: Variable) -> Self::Output {
-        Term::from(self) - Term::from(rhs)
-    }
-}
-
-impl Div<Variable> for Rational64 {
-    type Output = Term;
-
-    fn div(self, rhs: Variable) -> Self::Output {
-        Term::from(self) / Term::from(rhs)
-    }
-}
 #[cfg(test)]
 mod tests {
+    use crate::TermMultiplierType;
+
     use super::*;
 
     #[test]
@@ -219,12 +74,12 @@ mod tests {
         let quotient = x / y;
         let quotient_by_term = x / Term::from(y);
 
-        let scalar_sum = x + Rational64::new(3, 1);
-        let scalar_difference = x - Rational64::new(3, 1);
-        let scalar_product = x * Rational64::new(2, 1);
-        let scalar_quotient = x / Rational64::new(2, 1);
-        let scalar_subtracted_by_variable = Rational64::new(3, 1) - x;
-        let scalar_divided_by_variable = Rational64::new(3, 1) / x;
+        let scalar_sum = x + TermMultiplierType::new(3, 1);
+        let scalar_difference = x - TermMultiplierType::new(3, 1);
+        let scalar_product = x * TermMultiplierType::new(2, 1);
+        let scalar_quotient = x / TermMultiplierType::new(2, 1);
+        let scalar_subtracted_by_variable = TermMultiplierType::new(3, 1) - x;
+        let scalar_divided_by_variable = TermMultiplierType::new(3, 1) / x;
 
         assert_eq!(negated.to_string(), "-1x");
         assert_eq!(sum.to_string(), "x + y");
@@ -235,9 +90,9 @@ mod tests {
 
         assert_eq!(scalar_sum.to_string(), "3 + x");
         assert_eq!(scalar_difference.to_string(), "-3 + x");
-        assert_eq!(scalar_product.multiplier(), Rational64::new(2, 1));
+        assert_eq!(scalar_product.multiplier(), TermMultiplierType::new(2, 1));
         assert_eq!(scalar_product.to_string(), "2x");
-        assert_eq!(scalar_quotient.multiplier(), Rational64::new(1, 2));
+        assert_eq!(scalar_quotient.multiplier(), TermMultiplierType::new(1, 2));
         assert_eq!(scalar_quotient.to_string(), "(1/2)x");
         assert_eq!(scalar_subtracted_by_variable.to_string(), "3 - x");
         assert_eq!(scalar_divided_by_variable.to_string(), "3x⁻¹");
@@ -251,7 +106,7 @@ mod tests {
 
         assert!(expr.contains_variable(&x));
         assert!(term.contains_variable(&x));
-        assert_eq!(term.multiplier(), Rational64::new(2, 1));
+        assert_eq!(term.multiplier(), TermMultiplierType::new(2, 1));
     }
 
     #[test]

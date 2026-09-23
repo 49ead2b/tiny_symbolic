@@ -1,22 +1,16 @@
-use num::Rational64;
-use std::{
-    collections::BTreeMap,
-    fmt::Display,
-    iter::Sum,
-    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
-};
+use crate::TermMultiplierType;
+use std::{collections::BTreeMap, fmt::Display, iter::Sum, ops::Add};
 
 use crate::{
-    RationalExpression,
+    TermVariablePowerType,
     forms::{term::Term, variable::Variable},
-    impl_commutative_op,
     operations::derivative::PartialDerivative,
 };
 
 /// A symbolic expression consisting of a sum of terms.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct Expression {
-    terms: BTreeMap<BTreeMap<Variable, i32>, Rational64>,
+    pub(super) terms: BTreeMap<BTreeMap<Variable, TermVariablePowerType>, TermMultiplierType>,
 }
 
 impl Expression {
@@ -35,7 +29,7 @@ impl Expression {
 
     /// Raises this expression to a power
     /// Raising to a negative power is not supported in this version unless self is just a Term
-    pub fn pow(self, power: i32) -> Self {
+    pub fn pow(self, power: TermVariablePowerType) -> Self {
         if power == 0 {
             if self.is_zero() {
                 panic!("0 to the power of 0 is undefined!");
@@ -95,7 +89,7 @@ impl Expression {
     pub fn substitute_variable_power_with_expression(
         self,
         variable: Variable,
-        known_power: i32,
+        known_power: TermVariablePowerType,
         subst: Expression,
     ) -> Expression {
         let mut expression = Expression::default();
@@ -196,6 +190,13 @@ impl Expression {
     }
 }
 
+impl Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let output = self.to_string_internal(false);
+        write!(f, "{output}")
+    }
+}
+
 impl TryInto<Term> for Expression {
     type Error = String;
 
@@ -211,8 +212,12 @@ impl TryInto<Term> for Expression {
     }
 }
 
-impl From<Term> for Expression {
-    fn from(value: Term) -> Self {
+impl<T> From<T> for Expression
+where
+    T: Into<Term>,
+{
+    fn from(value: T) -> Self {
+        let value = value.into();
         let (variables, multiplier) = value.dissolve();
         let mut expression = Self::default();
         if multiplier != 0.into() {
@@ -223,363 +228,9 @@ impl From<Term> for Expression {
     }
 }
 
-impl From<Variable> for Expression {
-    fn from(value: Variable) -> Self {
-        Expression::from(Term::from(value))
-    }
-}
-
-impl<T> From<T> for Expression
-where
-    T: Into<Rational64>,
-{
-    fn from(value: T) -> Self {
-        Expression::from(Term::from(value))
-    }
-}
-
-impl Display for Expression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let output = self.to_string_internal(false);
-        write!(f, "{output}")
-    }
-}
-
 impl Sum for Expression {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(Self::default(), Add::add)
-    }
-}
-
-impl Neg for Expression {
-    type Output = Self;
-
-    fn neg(mut self) -> Self::Output {
-        for multiplier in self.terms.values_mut() {
-            *multiplier *= -1;
-        }
-        self
-    }
-}
-
-impl Add for Expression {
-    type Output = Expression;
-
-    fn add(mut self, rhs: Self) -> Self::Output {
-        self += rhs;
-        self
-    }
-}
-
-impl AddAssign for Expression {
-    fn add_assign(&mut self, rhs: Self) {
-        for (variables, multiplier) in rhs.terms {
-            *self += Term::from_btreemap(variables, multiplier);
-        }
-    }
-}
-
-impl Mul for Expression {
-    type Output = Expression;
-
-    fn mul(self, rhs: Expression) -> Self::Output {
-        let mut expression = Expression::default();
-
-        for (variables, multiplier) in self.terms {
-            let term = Term::from_btreemap(variables, multiplier);
-            expression += rhs.clone() * term;
-        }
-
-        expression
-    }
-}
-
-impl MulAssign for Expression {
-    fn mul_assign(&mut self, rhs: Expression) {
-        *self = self.clone() * rhs;
-    }
-}
-
-impl Sub for Expression {
-    type Output = Expression;
-
-    fn sub(mut self, rhs: Self) -> Self::Output {
-        self -= rhs;
-        self
-    }
-}
-
-impl SubAssign for Expression {
-    fn sub_assign(&mut self, rhs: Self) {
-        for (variables, multiplier) in rhs.terms {
-            *self += -Term::from_btreemap(variables, multiplier);
-        }
-    }
-}
-
-impl Sub<RationalExpression> for Expression {
-    type Output = RationalExpression;
-
-    fn sub(self, rhs: RationalExpression) -> Self::Output {
-        -(rhs - self)
-    }
-}
-
-impl Div<RationalExpression> for Expression {
-    type Output = RationalExpression;
-
-    fn div(self, rhs: RationalExpression) -> Self::Output {
-        (rhs / self).inverse()
-    }
-}
-
-impl Div<Expression> for Expression {
-    type Output = RationalExpression;
-
-    fn div(self, rhs: Expression) -> Self::Output {
-        RationalExpression::from(self) / RationalExpression::from(rhs)
-    }
-}
-
-impl Add<Term> for Expression {
-    type Output = Expression;
-
-    fn add(mut self, rhs: Term) -> Self::Output {
-        self += rhs;
-        self
-    }
-}
-
-impl AddAssign<Term> for Expression {
-    fn add_assign(&mut self, rhs: Term) {
-        if let Some(multiplier) = self.terms.get_mut(rhs.variables()) {
-            *multiplier += rhs.multiplier();
-            if *multiplier == 0.into() {
-                self.terms.remove(rhs.variables());
-            }
-        } else {
-            let (variables, multiplier) = rhs.dissolve();
-            if multiplier != 0.into() {
-                self.terms.insert(variables, multiplier);
-            }
-        }
-    }
-}
-
-impl Mul<Term> for Expression {
-    type Output = Expression;
-
-    fn mul(self, rhs: Term) -> Self::Output {
-        let mut expression = Expression::default();
-
-        for (variables, multiplier) in self.terms {
-            let term = Term::from_btreemap(variables, multiplier);
-            expression += term * rhs.clone();
-        }
-
-        expression
-    }
-}
-
-impl MulAssign<Term> for Expression {
-    fn mul_assign(&mut self, rhs: Term) {
-        *self = self.clone() * rhs
-    }
-}
-
-impl Sub<Term> for Expression {
-    type Output = Expression;
-
-    fn sub(mut self, rhs: Term) -> Self::Output {
-        self -= rhs;
-        self
-    }
-}
-
-impl SubAssign<Term> for Expression {
-    fn sub_assign(&mut self, rhs: Term) {
-        if let Some(multiplier) = self.terms.get_mut(rhs.variables()) {
-            *multiplier -= rhs.multiplier();
-            if *multiplier == 0.into() {
-                self.terms.remove(rhs.variables());
-            }
-        } else {
-            let (variables, multiplier) = rhs.dissolve();
-            if multiplier != 0.into() {
-                self.terms.insert(variables, -multiplier);
-            }
-        }
-    }
-}
-
-impl Div<Term> for Expression {
-    type Output = Expression;
-
-    fn div(self, rhs: Term) -> Self::Output {
-        let mut expression = Expression::default();
-
-        for (variables, multiplier) in self.terms {
-            let term = Term::from_btreemap(variables, multiplier);
-            expression += term / rhs.clone();
-        }
-
-        expression
-    }
-}
-
-impl DivAssign<Term> for Expression {
-    fn div_assign(&mut self, rhs: Term) {
-        *self = self.clone() / rhs
-    }
-}
-
-impl Add<Variable> for Expression {
-    type Output = Expression;
-
-    fn add(self, rhs: Variable) -> Self::Output {
-        self + Term::from(rhs)
-    }
-}
-
-impl AddAssign<Variable> for Expression {
-    fn add_assign(&mut self, rhs: Variable) {
-        *self = self.clone() + rhs
-    }
-}
-
-impl Mul<Variable> for Expression {
-    type Output = Expression;
-
-    fn mul(self, rhs: Variable) -> Self::Output {
-        self * Term::from(rhs)
-    }
-}
-
-impl_commutative_op!(Mul::mul, *, Variable, Expression, Expression);
-
-impl MulAssign<Variable> for Expression {
-    fn mul_assign(&mut self, rhs: Variable) {
-        *self = self.clone() * rhs
-    }
-}
-
-impl Sub<Variable> for Expression {
-    type Output = Expression;
-
-    fn sub(self, rhs: Variable) -> Self::Output {
-        self - Term::from(rhs)
-    }
-}
-
-impl SubAssign<Variable> for Expression {
-    fn sub_assign(&mut self, rhs: Variable) {
-        *self = self.clone() - rhs
-    }
-}
-
-impl Div<Variable> for Expression {
-    type Output = Expression;
-
-    fn div(self, rhs: Variable) -> Self::Output {
-        self / Term::from(rhs)
-    }
-}
-
-impl DivAssign<Variable> for Expression {
-    fn div_assign(&mut self, rhs: Variable) {
-        *self = self.clone() / rhs
-    }
-}
-
-impl<T> Add<T> for Expression
-where
-    T: Into<Rational64>,
-{
-    type Output = Expression;
-
-    fn add(self, rhs: T) -> Self::Output {
-        self + Term::from(rhs)
-    }
-}
-
-impl<T> AddAssign<T> for Expression
-where
-    T: Into<Rational64>,
-{
-    fn add_assign(&mut self, rhs: T) {
-        *self = self.clone() + rhs
-    }
-}
-
-impl<T> Mul<T> for Expression
-where
-    T: Into<Rational64>,
-{
-    type Output = Expression;
-
-    fn mul(self, rhs: T) -> Self::Output {
-        self * Term::from(rhs)
-    }
-}
-
-impl<T> MulAssign<T> for Expression
-where
-    T: Into<Rational64>,
-{
-    fn mul_assign(&mut self, rhs: T) {
-        *self = self.clone() * rhs
-    }
-}
-
-impl<T> Sub<T> for Expression
-where
-    T: Into<Rational64>,
-{
-    type Output = Expression;
-
-    fn sub(self, rhs: T) -> Self::Output {
-        self - Term::from(rhs)
-    }
-}
-
-impl<T> SubAssign<T> for Expression
-where
-    T: Into<Rational64>,
-{
-    fn sub_assign(&mut self, rhs: T) {
-        *self = self.clone() - rhs
-    }
-}
-
-impl<T> Div<T> for Expression
-where
-    T: Into<Rational64>,
-{
-    type Output = Expression;
-
-    fn div(self, rhs: T) -> Self::Output {
-        self / Term::from(rhs)
-    }
-}
-
-impl<T> DivAssign<T> for Expression
-where
-    T: Into<Rational64>,
-{
-    fn div_assign(&mut self, rhs: T) {
-        *self = self.clone() / rhs
-    }
-}
-
-impl_commutative_op!(Add::add, +, Rational64, Expression, Expression);
-
-impl_commutative_op!(Mul::mul, *, Rational64, Expression, Expression);
-
-impl Sub<Expression> for Rational64 {
-    type Output = Expression;
-
-    fn sub(self, rhs: Expression) -> Self::Output {
-        Expression::from(self) - rhs
     }
 }
 
@@ -628,10 +279,10 @@ mod tests {
         let product = (x + y) * x;
         let quotient = (x + y) / x;
 
-        let scalar_sum = (x + y) + Rational64::new(3, 1);
-        let scalar_difference = (x + y) - Rational64::new(3, 1);
-        let scalar_product = (x + y) * Rational64::new(2, 1);
-        let scalar_quotient = (x + y) / Rational64::new(2, 1);
+        let scalar_sum = (x + y) + TermMultiplierType::new(3, 1);
+        let scalar_difference = (x + y) - TermMultiplierType::new(3, 1);
+        let scalar_product = (x + y) * TermMultiplierType::new(2, 1);
+        let scalar_quotient = (x + y) / TermMultiplierType::new(2, 1);
 
         assert_eq!(sum.to_string(), "x + x² + y");
         assert_eq!(difference.to_string(), "y");
@@ -662,13 +313,13 @@ mod tests {
         add_assign_expression += x + y;
 
         let mut add_assign_scalar = x + y;
-        add_assign_scalar += Rational64::new(3, 1);
+        add_assign_scalar += TermMultiplierType::new(3, 1);
 
         let mut mul_assign_variable = x + y;
         mul_assign_variable *= x;
 
         let mut mul_assign_scalar = x + y;
-        mul_assign_scalar *= Rational64::new(2, 1);
+        mul_assign_scalar *= TermMultiplierType::new(2, 1);
 
         let mut mul_assign_expression = x + y;
         mul_assign_expression *= x + y;
@@ -677,7 +328,7 @@ mod tests {
         sub_assign_variable -= x;
 
         let mut sub_assign_scalar = x + y;
-        sub_assign_scalar -= Rational64::new(3, 1);
+        sub_assign_scalar -= TermMultiplierType::new(3, 1);
 
         let mut sub_assign_expression = x + y;
         sub_assign_expression -= x + y;
@@ -689,9 +340,9 @@ mod tests {
         div_assign_term /= x_term.clone();
 
         let mut div_assign_scalar = x + y;
-        div_assign_scalar /= Rational64::new(2, 1);
+        div_assign_scalar /= TermMultiplierType::new(2, 1);
 
-        let scalar_sub_expression = Rational64::new(3, 1) - (x + y);
+        let scalar_sub_expression = TermMultiplierType::new(3, 1) - (x + y);
 
         assert_eq!(summed.to_string(), "x + x² + y");
         assert_eq!(negated.to_string(), "-x - y");
@@ -715,7 +366,7 @@ mod tests {
         let vp1 = Variable::new('y', Some(2)).pow(3);
         let vp2 = Variable::new('x', Some(1)).pow(4);
 
-        let term = (vp1 * vp2.clone()) * Rational64::new(3, 2);
+        let term = (vp1 * vp2.clone()) * TermMultiplierType::new(3, 2);
         let expr = term + vp2.clone();
 
         assert!(expr.contains_term(&vp2));
@@ -814,7 +465,7 @@ mod tests {
     fn test_expression_helper_behaviors() {
         let x = Variable::new('x', None);
         let y = Variable::new('y', None);
-        let scalar_expression = Expression::from(Rational64::new(3, 1));
+        let scalar_expression = Expression::from(TermMultiplierType::new(3, 1));
         let divisible_expression = x.pow(2) * y + x;
         let multi_term_expression = x + y;
 

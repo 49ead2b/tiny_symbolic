@@ -1,74 +1,17 @@
-//! Convenience operator overloads for combining integer scalars with symbolic values.
-//!
-//! These impls keep arithmetic ergonomic for lightweight symbolic work without introducing
-//! a separate public API surface.
-
-use num::{Integer, Rational64};
-
-use crate::forms::{
-    expression::Expression, rational_expression::RationalExpression, term::Term, variable::Variable,
-};
-use crate::impl_commutative_op;
-use std::ops::{Div, Sub};
-
-impl_commutative_op!(Add::add, +, i64, Variable, Expression);
-impl_commutative_op!(Mul::mul, *, i64, Variable, Term);
-impl_commutative_op!(Add::add, +, i64, Term, Expression);
-impl_commutative_op!(Mul::mul, *, i64, Term, Term);
-impl_commutative_op!(Add::add, +, i64, Expression, Expression);
-impl_commutative_op!(Mul::mul, *, i64, Expression, Expression);
-impl_commutative_op!(Add::add, +, i64, RationalExpression, RationalExpression);
-impl_commutative_op!(Mul::mul, *, i64, RationalExpression, RationalExpression);
-
-impl Sub<Variable> for i64 {
-    type Output = Expression;
-
-    fn sub(self, rhs: Variable) -> Self::Output {
-        Term::from(self) - rhs
-    }
-}
-
-impl Div<Variable> for i64 {
-    type Output = Term;
-
-    fn div(self, rhs: Variable) -> Self::Output {
-        Term::from(self) / rhs
-    }
-}
-
-impl Sub<Term> for i64 {
-    type Output = Expression;
-
-    fn sub(self, rhs: Term) -> Self::Output {
-        Term::from(self) - rhs
-    }
-}
-
-impl Div<Term> for i64 {
-    type Output = Term;
-
-    fn div(self, rhs: Term) -> Self::Output {
-        Term::from(self) / rhs
-    }
-}
-
-impl Sub<Expression> for i64 {
-    type Output = Expression;
-
-    fn sub(self, rhs: Expression) -> Self::Output {
-        Expression::from(self) - rhs
-    }
-}
+use crate::*;
+use num::Integer;
 
 /// Computes the least common multiple of two rational numbers.
-pub fn rational_lcm(x: &Rational64, y: &Rational64) -> Rational64 {
+pub fn rational_lcm(x: &TermMultiplierType, y: &TermMultiplierType) -> TermMultiplierType {
     let num = x.numer().lcm(y.numer());
     let den = x.denom().gcd(y.denom());
-    Rational64::new(num, den)
+    TermMultiplierType::new(num, den)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::Variable;
+
     use super::*;
 
     #[test]
@@ -105,15 +48,15 @@ mod tests {
 
     #[test]
     fn test_rational_lcm() {
-        let a = Rational64::new(2, 7);
-        let b = Rational64::new(3, 14);
-        let c = Rational64::new(5, 3);
+        let a = TermMultiplierType::new(2, 7);
+        let b = TermMultiplierType::new(3, 14);
+        let c = TermMultiplierType::new(5, 3);
         let lcm = rational_lcm(&rational_lcm(&a, &b), &c);
-        assert_eq!(lcm, Rational64::new(30, 1));
+        assert_eq!(lcm, TermMultiplierType::new(30, 1));
 
-        let b = Rational64::new(3, 4);
-        let c = Rational64::new(3, 2);
+        let b = TermMultiplierType::new(3, 4);
+        let c = TermMultiplierType::new(3, 2);
         let lcm = rational_lcm(&b, &c);
-        assert_eq!(lcm, Rational64::new(3, 2));
+        assert_eq!(lcm, TermMultiplierType::new(3, 2));
     }
 }

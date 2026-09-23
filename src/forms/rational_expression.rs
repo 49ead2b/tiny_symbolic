@@ -1,9 +1,9 @@
 use crate::{operations::derivative::PartialDerivative, *};
-use num::Rational64;
 use std::{
     collections::HashMap,
     fmt::Display,
-    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
+    iter::Sum,
+    ops::{Add, Mul},
 };
 
 /// Rational expression consisting of a numerator and a denominator, both of which are expression
@@ -12,8 +12,56 @@ use std::{
 /// Even though taken together, they are mathematically identical
 #[derive(Debug, Clone, Eq)]
 pub struct RationalExpression {
-    numerator: Expression,
-    denominator: Expression,
+    pub(super) numerator: Expression,
+    pub(super) denominator: Expression,
+}
+
+impl Display for RationalExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let output = self.to_string_internal(false);
+        write!(f, "{output}")
+    }
+}
+
+impl Default for RationalExpression {
+    fn default() -> Self {
+        Self {
+            numerator: Expression::default(),
+            denominator: 1.into(),
+        }
+    }
+}
+
+impl TryInto<Expression> for RationalExpression {
+    type Error = String;
+
+    fn try_into(self) -> Result<Expression, Self::Error> {
+        let (numerator, denominator) = self.dissolve_into_numerator_and_denominator();
+        if denominator.is_term() && denominator != 0.into() {
+            let denominator: Term = denominator.try_into().unwrap();
+            Ok(numerator / denominator)
+        } else {
+            Err("Cannot be reduced to a expression!".to_string())
+        }
+    }
+}
+
+impl<T> From<T> for RationalExpression
+where
+    T: Into<Expression>,
+{
+    fn from(value: T) -> Self {
+        Self {
+            numerator: value.into(),
+            denominator: 1.into(),
+        }
+    }
+}
+
+impl Sum for RationalExpression {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.fold(Self::default(), Add::add)
+    }
 }
 
 impl PartialEq for RationalExpression {
@@ -66,7 +114,7 @@ impl RationalExpression {
     }
 
     /// Raises this rational expression to a power
-    pub fn pow(self, power: i32) -> Self {
+    pub fn pow(self, power: TermVariablePowerType) -> Self {
         if power == 0 {
             if self.is_zero() {
                 panic!("0 to the power of 0 is undefined!");
@@ -102,7 +150,7 @@ impl RationalExpression {
     pub fn substitute_variable_power_with_expression(
         self,
         variable: Variable,
-        known_power: i32,
+        known_power: TermVariablePowerType,
         subst: Expression,
     ) -> RationalExpression {
         Self::new(
@@ -136,12 +184,16 @@ impl RationalExpression {
                 if is_positive && *power < 0 {
                     variables_powers
                         .entry(*variable)
-                        .and_modify(|min_power: &mut i32| *min_power = (*min_power).min(*power))
+                        .and_modify(|min_power: &mut TermVariablePowerType| {
+                            *min_power = (*min_power).min(*power)
+                        })
                         .or_insert(*power);
                 } else if !is_positive && *power > 0 {
                     variables_powers
                         .entry(*variable)
-                        .and_modify(|max_power: &mut i32| *max_power = (*max_power).min(*power))
+                        .and_modify(|max_power: &mut TermVariablePowerType| {
+                            *max_power = (*max_power).min(*power)
+                        })
                         .or_insert(*power);
                 }
             }
@@ -209,189 +261,16 @@ impl RationalExpression {
     }
 }
 
-impl Default for RationalExpression {
-    fn default() -> Self {
-        Self {
-            numerator: Expression::default(),
-            denominator: 1.into(),
-        }
-    }
-}
-
-impl TryInto<Expression> for RationalExpression {
-    type Error = String;
-
-    fn try_into(self) -> Result<Expression, Self::Error> {
-        let (numerator, denominator) = self.dissolve_into_numerator_and_denominator();
-        if denominator.is_term() && denominator != 0.into() {
-            let denominator: Term = denominator.try_into().unwrap();
-            Ok(numerator / denominator)
-        } else {
-            Err("Cannot be reduced to a expression!".to_string())
-        }
-    }
-}
-
-impl<T> From<T> for RationalExpression
-where
-    T: Into<Expression>,
-{
-    fn from(value: T) -> Self {
-        Self {
-            numerator: value.into(),
-            denominator: 1.into(),
-        }
-    }
-}
-
-impl Display for RationalExpression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let output = self.to_string_internal(false);
-        write!(f, "{output}")
-    }
-}
-
-impl Neg for RationalExpression {
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
-        Self::new(-self.numerator, self.denominator)
-    }
-}
-
-impl Add for RationalExpression {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self::new(
-            self.numerator * rhs.denominator.clone() + rhs.numerator * self.denominator.clone(),
-            self.denominator * rhs.denominator,
-        )
-    }
-}
-
-impl<T> Add<T> for RationalExpression
-where
-    T: Into<Expression>,
-{
-    type Output = Self;
-
-    fn add(self, rhs: T) -> Self::Output {
-        let rhs = RationalExpression::from(rhs.into());
-        self + rhs
-    }
-}
-
-impl_commutative_op!(Add::add, +, Expression, RationalExpression, RationalExpression);
-impl_commutative_op!(Add::add, +, Term, RationalExpression, RationalExpression);
-impl_commutative_op!(Add::add, +, Variable, RationalExpression, RationalExpression);
-impl_commutative_op!(Add::add, +, Rational64, RationalExpression, RationalExpression);
-
-impl AddAssign for RationalExpression {
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.clone() + rhs;
-    }
-}
-
-impl Sub for RationalExpression {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Self::new(
-            self.numerator * rhs.denominator.clone() - rhs.numerator * self.denominator.clone(),
-            self.denominator * rhs.denominator,
-        )
-    }
-}
-
-impl<T> Sub<T> for RationalExpression
-where
-    T: Into<Expression>,
-{
-    type Output = Self;
-
-    fn sub(self, rhs: T) -> Self::Output {
-        let rhs = RationalExpression::from(rhs.into());
-        self - rhs
-    }
-}
-
-impl SubAssign for RationalExpression {
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = self.clone() - rhs;
-    }
-}
-
-impl Mul for RationalExpression {
-    type Output = Self;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        Self::new(
-            self.numerator * rhs.numerator,
-            self.denominator * rhs.denominator,
-        )
-    }
-}
-
-impl<T> Mul<T> for RationalExpression
-where
-    T: Into<Expression>,
-{
-    type Output = Self;
-
-    fn mul(self, rhs: T) -> Self::Output {
-        let rhs = RationalExpression::from(rhs.into());
-        self * rhs
-    }
-}
-
-impl_commutative_op!(Mul::mul, *, Expression, RationalExpression, RationalExpression);
-impl_commutative_op!(Mul::mul, *, Term, RationalExpression, RationalExpression);
-impl_commutative_op!(Mul::mul, *, Variable, RationalExpression, RationalExpression);
-impl_commutative_op!(Mul::mul, *, Rational64, RationalExpression, RationalExpression);
-
-impl MulAssign for RationalExpression {
-    fn mul_assign(&mut self, rhs: Self) {
-        *self = self.clone() * rhs;
-    }
-}
-
-impl Div for RationalExpression {
-    type Output = Self;
-
-    fn div(self, rhs: Self) -> Self::Output {
-        Self::new(
-            self.numerator * rhs.denominator,
-            self.denominator * rhs.numerator,
-        )
-    }
-}
-
-impl<T> Div<T> for RationalExpression
-where
-    T: Into<Expression>,
-{
-    type Output = Self;
-
-    fn div(self, rhs: T) -> Self::Output {
-        let rhs = RationalExpression::from(rhs.into());
-        self / rhs
-    }
-}
-
-impl DivAssign for RationalExpression {
-    fn div_assign(&mut self, rhs: Self) {
-        *self = self.clone() / rhs;
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use num::traits::Inv;
 
     use super::*;
 
-    fn rational(numerator: i64, denominator: i64) -> RationalExpression {
+    fn rational(
+        numerator: TermVariablePowerType,
+        denominator: TermVariablePowerType,
+    ) -> RationalExpression {
         RationalExpression::new(numerator.into(), denominator.into())
     }
 
@@ -614,7 +493,7 @@ mod tests {
         let x = Variable::new('x', None);
         let y = Variable::new('y', None);
         let z = Variable::new('z', None);
-        let term = w.pow(-2) * y.pow(3) * x.pow(-7) * z.pow(4) * Rational64::new(7, 5);
+        let term = w.pow(-2) * y.pow(3) * x.pow(-7) * z.pow(4) * TermMultiplierType::new(7, 5);
 
         let rational_expression = RationalExpression::from(term);
 
@@ -630,9 +509,9 @@ mod tests {
         let x = Variable::new('x', None);
         let y = Variable::new('y', None);
         let z = Variable::new('z', None);
-        let expression = w.pow(-2) * z.pow(-7) * Rational64::new(2, 7)
-            + y.pow(3) * x.pow(-7) * Rational64::new(3, 14)
-            + x.pow(5) * z.pow(-4) * Rational64::new(5, 3);
+        let expression = w.pow(-2) * z.pow(-7) * TermMultiplierType::new(2, 7)
+            + y.pow(3) * x.pow(-7) * TermMultiplierType::new(3, 14)
+            + x.pow(5) * z.pow(-4) * TermMultiplierType::new(5, 3);
 
         let rational_expression = RationalExpression::new(expression.clone(), expression.pow(2));
 
@@ -677,11 +556,25 @@ mod tests {
         let y = Variable::new('y', None);
 
         let rational_expression_v1 =
-            RationalExpression::new((x + y) * Rational64::new(4, 3), (x + y).pow(2));
+            RationalExpression::new((x + y) * TermMultiplierType::new(4, 3), (x + y).pow(2));
 
         let rational_expression_v2 =
-            RationalExpression::new(1.into(), Rational64::new(4, 3).inv() * (x + y));
+            RationalExpression::new(1.into(), TermMultiplierType::new(4, 3).inv() * (x + y));
 
         assert_eq!(rational_expression_v1, rational_expression_v2);
+    }
+
+    #[test]
+    fn test_rational_expression_mul_num_and_deno() {
+        let x = Variable::new('x', None);
+        let y = Variable::new('y', None);
+
+        let rational_expression = RationalExpression::new(x + y, 1 + x)
+            .with_numerator_and_denominator_multiplied_by_expression(1 + x);
+
+        assert_eq!(
+            rational_expression.to_string(),
+            "(x + xy + x² + y)/(1 + 2x + x²)"
+        );
     }
 }

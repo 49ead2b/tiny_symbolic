@@ -1,21 +1,13 @@
-use std::{
-    fmt::Display,
-    ops::{Add, Div, Mul, Sub},
-};
+use std::fmt::Display;
 
-use crate::{
-    RationalExpression, Term,
-    algos::ElementarySymmetricPolynomials,
-    forms::{expression::Expression, variable::Variable},
-    operations::derivative::PartialDerivative,
-};
+use crate::{algos::ElementarySymmetricPolynomials, operations::derivative::PartialDerivative, *};
 
 /// A polynomial consisting of expression coefficients and a variable raised to a successive power.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Polynomial {
-    variable: Variable,
-    coefficients: Vec<Expression>,
-    order: usize,
+    pub(super) variable: Variable,
+    pub(super) coefficients: Vec<Expression>,
+    pub(super) order: usize,
 }
 
 impl Polynomial {
@@ -45,6 +37,10 @@ impl Polynomial {
 
     /// Create a Polynomial from an expression and a variable. The expression is decomposed into terms to extract the coefficients for each power of the variable.
     pub fn from_expression(expression: Expression, variable: Variable) -> Self {
+        if expression.is_zero() {
+            return Self::new(variable, vec![0]);
+        }
+
         let terms = expression.dissolve_into_terms();
         let highest_power = terms
             .iter()
@@ -123,9 +119,16 @@ impl Polynomial {
             if k > 0 {
                 if is_sympy {
                     data.push('*');
-                    data.push_str(&poly_variable.pow(k as i32).to_string_sympy());
+                    data.push_str(
+                        &poly_variable
+                            .pow(k as TermVariablePowerType)
+                            .to_string_sympy(),
+                    );
                 } else {
-                    data.push_str(&format!("{}", poly_variable.pow(k as i32)));
+                    data.push_str(&format!(
+                        "{}",
+                        poly_variable.pow(k as TermVariablePowerType)
+                    ));
                 }
             }
 
@@ -165,92 +168,16 @@ impl From<&Polynomial> for Expression {
             .coefficients
             .iter()
             .enumerate()
-            .map(|(power, coefficient)| coefficient.clone() * polynomial.variable.pow(power as i32))
-            .fold(Expression::default(), Add::add)
+            .map(|(power, coefficient)| {
+                coefficient.clone() * polynomial.variable.pow(power as TermVariablePowerType)
+            })
+            .fold(Expression::default(), std::ops::Add::add)
     }
 }
 
 impl From<Polynomial> for Expression {
     fn from(polynomial: Polynomial) -> Self {
         Expression::from(&polynomial)
-    }
-}
-
-impl Add<Polynomial> for Polynomial {
-    type Output = Polynomial;
-
-    fn add(self, rhs: Polynomial) -> Self::Output {
-        if self.variable != rhs.variable {
-            panic!("Cannot add polynomials with different variables!");
-        }
-
-        let max_order = usize::max(self.order, rhs.order);
-        let mut new_coefficients = vec![Expression::default(); max_order + 1];
-
-        for (i, coeff) in self.coefficients.into_iter().enumerate() {
-            new_coefficients[i] += coeff;
-        }
-
-        for (i, coeff) in rhs.coefficients.into_iter().enumerate() {
-            new_coefficients[i] += coeff;
-        }
-
-        Polynomial::new(self.variable, new_coefficients)
-    }
-}
-
-impl Sub<Polynomial> for Polynomial {
-    type Output = Polynomial;
-
-    fn sub(self, rhs: Polynomial) -> Self::Output {
-        if self.variable != rhs.variable {
-            panic!("Cannot subtract polynomials with different variables!");
-        }
-
-        let max_order = usize::max(self.order, rhs.order);
-        let mut new_coefficients = vec![Expression::default(); max_order + 1];
-
-        for (i, coeff) in self.coefficients.into_iter().enumerate() {
-            new_coefficients[i] += coeff;
-        }
-
-        for (i, coeff) in rhs.coefficients.into_iter().enumerate() {
-            new_coefficients[i] -= coeff;
-        }
-
-        Polynomial::new(self.variable, new_coefficients)
-    }
-}
-
-impl Mul<Polynomial> for Polynomial {
-    type Output = Polynomial;
-
-    fn mul(self, rhs: Polynomial) -> Self::Output {
-        if self.variable != rhs.variable {
-            panic!("Cannot multiply polynomials with different variables!");
-        }
-
-        let variable = self.variable;
-        let expression1 = Expression::from(self);
-        let expression2 = Expression::from(rhs);
-        let product_expression = expression1 * expression2;
-
-        Polynomial::from_expression(product_expression, variable)
-    }
-}
-
-impl Div<Polynomial> for Polynomial {
-    type Output = RationalExpression;
-
-    fn div(self, rhs: Polynomial) -> Self::Output {
-        if self.variable != rhs.variable {
-            panic!("Cannot divide polynomials with different variables!");
-        }
-
-        let expression1 = Expression::from(self);
-        let expression2 = Expression::from(rhs);
-
-        expression1 / expression2
     }
 }
 
@@ -276,7 +203,7 @@ impl PartialDerivative for Polynomial {
 #[cfg(test)]
 mod tests {
     use super::Polynomial;
-    use crate::*;
+    use crate::{operations::derivative::PartialDerivative, *};
 
     #[test]
     fn basic_test() {
@@ -352,6 +279,56 @@ mod tests {
         let quadratic = Polynomial::from_expression(quadratic, variable);
         let constant = quadratic.compute_nth_derivative(2);
         assert_eq!(constant.to_string(), "(2a)");
+    }
+
+    #[test]
+    fn partial_derivative_wrt_variable_test() {
+        let x = Variable::new('x', None);
+        let a = Variable::new('a', None);
+        let b = Variable::new('b', None);
+        let c = Variable::new('c', None);
+        let polynomial = Polynomial::new(x, vec![c, b, a]);
+
+        assert_eq!(
+            polynomial.calculate_derivate_wrt_variable(&x),
+            Polynomial::new(x, vec![Expression::from(b), (2 * a).into()])
+        );
+        assert_eq!(
+            polynomial.calculate_derivate_wrt_variable(&a),
+            Polynomial::new(x, vec![0, 0, 1])
+        );
+        assert_eq!(
+            polynomial.calculate_derivate_wrt_variable(&Variable::new('y', None)),
+            Polynomial::new(x, vec![0])
+        );
+    }
+
+    #[test]
+    fn nth_partial_derivative_wrt_variable_test() {
+        let x = Variable::new('x', None);
+        let a = Variable::new('a', None);
+        let b = Variable::new('b', None);
+        let polynomial = Polynomial::new(
+            x,
+            vec![
+                Expression::from(1),
+                Expression::from(b),
+                Expression::from(a),
+            ],
+        );
+
+        assert_eq!(
+            polynomial.calculate_nth_derivate_wrt_variable(2, &x),
+            Polynomial::new(x, vec![2 * a])
+        );
+        assert_eq!(
+            polynomial.calculate_nth_derivate_wrt_variable(2, &a),
+            Polynomial::new(x, vec![0])
+        );
+        assert_eq!(
+            polynomial.calculate_nth_derivate_wrt_variable(0, &x),
+            polynomial
+        );
     }
 
     #[test]
