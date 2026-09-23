@@ -2,6 +2,7 @@ use fmtastic::Superscript;
 use num::Zero;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::Hash;
+use std::iter::Product;
 use std::{fmt::Display, ops::Mul};
 
 use crate::operations::derivative::PartialDerivative;
@@ -12,28 +13,6 @@ use crate::*;
 pub struct Term {
     pub(super) variables: BTreeMap<Variable, TermVariablePowerType>,
     pub(super) multiplier: TermMultiplierType,
-}
-
-impl Default for Term {
-    fn default() -> Self {
-        Self {
-            variables: Default::default(),
-            multiplier: TermMultiplierType::new(1, 1),
-        }
-    }
-}
-
-impl Display for Term {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let variables = self.variables();
-        let multiplier = self.multiplier();
-
-        write!(
-            f,
-            "{}",
-            Term::to_string_internal(variables, multiplier, false)
-        )
-    }
 }
 
 impl Term {
@@ -331,6 +310,74 @@ impl Term {
     }
 }
 
+impl Default for Term {
+    fn default() -> Self {
+        Self {
+            variables: Default::default(),
+            multiplier: TermMultiplierType::new(1, 1),
+        }
+    }
+}
+
+impl Display for Term {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let variables = self.variables();
+        let multiplier = self.multiplier();
+
+        write!(
+            f,
+            "{}",
+            Term::to_string_internal(variables, multiplier, false)
+        )
+    }
+}
+
+impl From<Variable> for Term {
+    fn from(value: Variable) -> Self {
+        let mut term = Self::default();
+        term.variables.insert(value, 1);
+        term
+    }
+}
+
+impl TryInto<Variable> for Term {
+    type Error = String;
+
+    fn try_into(self) -> Result<Variable, Self::Error> {
+        let mut variable_powers = self
+            .variables
+            .into_iter()
+            .filter(|(_, power)| *power != 0)
+            .collect::<Vec<_>>();
+        if self.multiplier != 1.into()
+            || variable_powers.len() != 1
+            || variable_powers.first().expect("Check Length above").1 != 0
+        {
+            Err("Cannot be reduced to a variable!".to_string())
+        } else {
+            Ok(variable_powers.pop().expect("Check Length above").0)
+        }
+    }
+}
+
+impl<T> From<T> for Term
+where
+    T: Into<TermMultiplierType>,
+{
+    fn from(value: T) -> Self {
+        Self {
+            variables: Default::default(),
+            multiplier: Into::<TermMultiplierType>::into(value),
+        }
+    }
+}
+
+impl Product for Term {
+    fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.fold(Self::default(), Mul::mul)
+    }
+}
+
 impl PartialDerivative for Term {
     fn calculate_derivate_wrt_variable(&self, variable: &Variable) -> Self {
         let mut output = self.clone();
@@ -352,26 +399,6 @@ impl PartialDerivative for Term {
         residue.set_power_of_variable(variable, smallest);
         residue *= TermMultiplierType::from(multiplier);
         residue * output
-    }
-}
-
-impl From<Variable> for Term {
-    fn from(value: Variable) -> Self {
-        let mut term = Self::default();
-        term.variables.insert(value, 1);
-        term
-    }
-}
-
-impl<T> From<T> for Term
-where
-    T: Into<TermMultiplierType>,
-{
-    fn from(value: T) -> Self {
-        Self {
-            variables: Default::default(),
-            multiplier: Into::<TermMultiplierType>::into(value),
-        }
     }
 }
 

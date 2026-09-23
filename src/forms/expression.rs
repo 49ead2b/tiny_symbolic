@@ -190,6 +190,13 @@ impl Expression {
     }
 }
 
+impl Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let output = self.to_string_internal(false);
+        write!(f, "{output}")
+    }
+}
+
 impl TryInto<Term> for Expression {
     type Error = String;
 
@@ -205,8 +212,12 @@ impl TryInto<Term> for Expression {
     }
 }
 
-impl From<Term> for Expression {
-    fn from(value: Term) -> Self {
+impl<T> From<T> for Expression
+where
+    T: Into<Term>,
+{
+    fn from(value: T) -> Self {
+        let value = value.into();
         let (variables, multiplier) = value.dissolve();
         let mut expression = Self::default();
         if multiplier != 0.into() {
@@ -214,28 +225,6 @@ impl From<Term> for Expression {
         }
 
         expression
-    }
-}
-
-impl From<Variable> for Expression {
-    fn from(value: Variable) -> Self {
-        Expression::from(Term::from(value))
-    }
-}
-
-impl<T> From<T> for Expression
-where
-    T: Into<TermMultiplierType>,
-{
-    fn from(value: T) -> Self {
-        Expression::from(Term::from(value))
-    }
-}
-
-impl Display for Expression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let output = self.to_string_internal(false);
-        write!(f, "{output}")
     }
 }
 

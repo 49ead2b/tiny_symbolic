@@ -1,5 +1,10 @@
 use crate::{operations::derivative::PartialDerivative, *};
-use std::{collections::HashMap, fmt::Display, ops::Mul};
+use std::{
+    collections::HashMap,
+    fmt::Display,
+    iter::Sum,
+    ops::{Add, Mul},
+};
 
 /// Rational expression consisting of a numerator and a denominator, both of which are expression
 /// Since multiplying numerator and denominator with the same thing does not change the value
@@ -9,6 +14,54 @@ use std::{collections::HashMap, fmt::Display, ops::Mul};
 pub struct RationalExpression {
     pub(super) numerator: Expression,
     pub(super) denominator: Expression,
+}
+
+impl Display for RationalExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let output = self.to_string_internal(false);
+        write!(f, "{output}")
+    }
+}
+
+impl Default for RationalExpression {
+    fn default() -> Self {
+        Self {
+            numerator: Expression::default(),
+            denominator: 1.into(),
+        }
+    }
+}
+
+impl TryInto<Expression> for RationalExpression {
+    type Error = String;
+
+    fn try_into(self) -> Result<Expression, Self::Error> {
+        let (numerator, denominator) = self.dissolve_into_numerator_and_denominator();
+        if denominator.is_term() && denominator != 0.into() {
+            let denominator: Term = denominator.try_into().unwrap();
+            Ok(numerator / denominator)
+        } else {
+            Err("Cannot be reduced to a expression!".to_string())
+        }
+    }
+}
+
+impl<T> From<T> for RationalExpression
+where
+    T: Into<Expression>,
+{
+    fn from(value: T) -> Self {
+        Self {
+            numerator: value.into(),
+            denominator: 1.into(),
+        }
+    }
+}
+
+impl Sum for RationalExpression {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.fold(Self::default(), Add::add)
+    }
 }
 
 impl PartialEq for RationalExpression {
@@ -205,48 +258,6 @@ impl RationalExpression {
         self.numerator *= value.clone();
         self.denominator *= value;
         self
-    }
-}
-
-impl Default for RationalExpression {
-    fn default() -> Self {
-        Self {
-            numerator: Expression::default(),
-            denominator: 1.into(),
-        }
-    }
-}
-
-impl TryInto<Expression> for RationalExpression {
-    type Error = String;
-
-    fn try_into(self) -> Result<Expression, Self::Error> {
-        let (numerator, denominator) = self.dissolve_into_numerator_and_denominator();
-        if denominator.is_term() && denominator != 0.into() {
-            let denominator: Term = denominator.try_into().unwrap();
-            Ok(numerator / denominator)
-        } else {
-            Err("Cannot be reduced to a expression!".to_string())
-        }
-    }
-}
-
-impl<T> From<T> for RationalExpression
-where
-    T: Into<Expression>,
-{
-    fn from(value: T) -> Self {
-        Self {
-            numerator: value.into(),
-            denominator: 1.into(),
-        }
-    }
-}
-
-impl Display for RationalExpression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let output = self.to_string_internal(false);
-        write!(f, "{output}")
     }
 }
 
@@ -551,5 +562,19 @@ mod tests {
             RationalExpression::new(1.into(), TermMultiplierType::new(4, 3).inv() * (x + y));
 
         assert_eq!(rational_expression_v1, rational_expression_v2);
+    }
+
+    #[test]
+    fn test_rational_expression_mul_num_and_deno() {
+        let x = Variable::new('x', None);
+        let y = Variable::new('y', None);
+
+        let rational_expression = RationalExpression::new(x + y, 1 + x)
+            .with_numerator_and_denominator_multiplied_by_expression(1 + x);
+
+        assert_eq!(
+            rational_expression.to_string(),
+            "(x + xy + x² + y)/(1 + 2x + x²)"
+        );
     }
 }

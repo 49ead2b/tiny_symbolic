@@ -37,6 +37,10 @@ impl Polynomial {
 
     /// Create a Polynomial from an expression and a variable. The expression is decomposed into terms to extract the coefficients for each power of the variable.
     pub fn from_expression(expression: Expression, variable: Variable) -> Self {
+        if expression.is_zero() {
+            return Self::new(variable, vec![0]);
+        }
+
         let terms = expression.dissolve_into_terms();
         let highest_power = terms
             .iter()
@@ -199,7 +203,7 @@ impl PartialDerivative for Polynomial {
 #[cfg(test)]
 mod tests {
     use super::Polynomial;
-    use crate::*;
+    use crate::{operations::derivative::PartialDerivative, *};
 
     #[test]
     fn basic_test() {
@@ -275,6 +279,56 @@ mod tests {
         let quadratic = Polynomial::from_expression(quadratic, variable);
         let constant = quadratic.compute_nth_derivative(2);
         assert_eq!(constant.to_string(), "(2a)");
+    }
+
+    #[test]
+    fn partial_derivative_wrt_variable_test() {
+        let x = Variable::new('x', None);
+        let a = Variable::new('a', None);
+        let b = Variable::new('b', None);
+        let c = Variable::new('c', None);
+        let polynomial = Polynomial::new(x, vec![c, b, a]);
+
+        assert_eq!(
+            polynomial.calculate_derivate_wrt_variable(&x),
+            Polynomial::new(x, vec![Expression::from(b), (2 * a).into()])
+        );
+        assert_eq!(
+            polynomial.calculate_derivate_wrt_variable(&a),
+            Polynomial::new(x, vec![0, 0, 1])
+        );
+        assert_eq!(
+            polynomial.calculate_derivate_wrt_variable(&Variable::new('y', None)),
+            Polynomial::new(x, vec![0])
+        );
+    }
+
+    #[test]
+    fn nth_partial_derivative_wrt_variable_test() {
+        let x = Variable::new('x', None);
+        let a = Variable::new('a', None);
+        let b = Variable::new('b', None);
+        let polynomial = Polynomial::new(
+            x,
+            vec![
+                Expression::from(1),
+                Expression::from(b),
+                Expression::from(a),
+            ],
+        );
+
+        assert_eq!(
+            polynomial.calculate_nth_derivate_wrt_variable(2, &x),
+            Polynomial::new(x, vec![2 * a])
+        );
+        assert_eq!(
+            polynomial.calculate_nth_derivate_wrt_variable(2, &a),
+            Polynomial::new(x, vec![0])
+        );
+        assert_eq!(
+            polynomial.calculate_nth_derivate_wrt_variable(0, &x),
+            polynomial
+        );
     }
 
     #[test]
