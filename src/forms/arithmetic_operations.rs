@@ -1,7 +1,6 @@
 mod assignment_operations {
-    use std::ops::{AddAssign, DivAssign, MulAssign, SubAssign};
-
     use crate::*;
+    use std::ops::{AddAssign, DivAssign, MulAssign, SubAssign};
 
     impl<T> MulAssign<T> for Term
     where
@@ -360,9 +359,8 @@ mod assignment_operations {
 }
 
 mod binary_operations {
-    use std::ops::{Add, Div, Mul, Neg, Sub};
-
     use crate::{impl_commutative_op, *};
+    use std::ops::{Add, Div, Mul, Neg, Sub};
 
     impl Neg for Variable {
         type Output = Term;
@@ -1294,6 +1292,212 @@ mod binary_operations {
             let _ = 5 / term.clone();
             let _ = 5 / expression.clone();
             let _ = 5 / rational.clone();
+        }
+    }
+}
+
+mod cumulative_operations {
+    use crate::*;
+    use std::{
+        iter::{Product, Sum},
+        ops::Add,
+        ops::Mul,
+    };
+
+    impl<T> Product<T> for Term
+    where
+        T: Into<Term>,
+    {
+        /// Multiplies all the terms.
+        /// ```
+        /// use tiny_symbolic::*;
+        /// let x = Variable::new('x', None);
+        /// let y = Variable::new('y', None);
+        /// let terms = vec![x.pow(2), 2 * x, y.into()];
+        /// assert_eq!(terms.into_iter().product::<Term>(), 2 * x.pow(3) * y);
+        /// assert_eq!(std::iter::empty::<Term>().product::<Term>(), Term::default());
+        /// ```
+        fn product<I: Iterator<Item = T>>(iter: I) -> Self {
+            iter.map(|v| v.into()).fold(Self::default(), Mul::mul)
+        }
+    }
+
+    impl<T> Sum<T> for Expression
+    where
+        T: Into<Expression>,
+    {
+        /// Adds all the expressions.
+        /// ```
+        /// use tiny_symbolic::*;
+        /// let x = Variable::new('x', None);
+        /// let y = Variable::new('y', None);
+        /// let terms = vec![x.pow(2), 2 * x, y.into()];
+        /// assert_eq!(terms.into_iter().sum::<Expression>(), x.pow(2) + 2 * x + y);
+        /// assert_eq!(std::iter::empty::<Expression>().sum::<Expression>(), Expression::default());
+        /// ```
+        fn sum<I: Iterator<Item = T>>(iter: I) -> Self {
+            iter.map(|v| v.into()).fold(Expression::default(), Add::add)
+        }
+    }
+
+    impl<T> Product<T> for Expression
+    where
+        T: Into<Expression>,
+    {
+        /// Multiplies all the expressions.
+        /// ```
+        /// use tiny_symbolic::*;
+        /// let x = Variable::new('x', None);
+        /// let y = Variable::new('y', None);
+        /// let terms = vec![x.pow(2), 2 * x, y.into()];
+        /// assert_eq!(terms.into_iter().product::<Expression>(), (2 * x.pow(3) * y).into());
+        /// assert_eq!(std::iter::empty::<Expression>().product::<Expression>(), 1.into());
+        /// ```
+        fn product<I: Iterator<Item = T>>(iter: I) -> Self {
+            iter.map(|v| v.into()).fold(1.into(), Mul::mul)
+        }
+    }
+
+    impl<T> Sum<T> for RationalExpression
+    where
+        T: Into<RationalExpression>,
+    {
+        /// Adds all the rational expressions.
+        /// ```
+        /// use tiny_symbolic::*;
+        /// let x = Variable::new('x', None);
+        /// let terms = vec![
+        ///     RationalExpression::from(1),
+        ///     RationalExpression::new(x.into(), x + 1),
+        ///     RationalExpression::new(2.into(), x + 1),
+        /// ];
+        /// assert_eq!(terms.into_iter().sum::<RationalExpression>(), RationalExpression::new(2 * x + 3, x + 1));
+        /// assert_eq!(std::iter::empty::<RationalExpression>().sum::<RationalExpression>(), RationalExpression::default());
+        /// ```
+        fn sum<I: Iterator<Item = T>>(iter: I) -> Self {
+            iter.map(|v| v.into())
+                .fold(RationalExpression::default(), Add::add)
+        }
+    }
+
+    impl<T> Product<T> for RationalExpression
+    where
+        T: Into<RationalExpression>,
+    {
+        /// Multiplies all the rational expressions.
+        /// ```
+        /// use tiny_symbolic::*;
+        /// let x = Variable::new('x', None);
+        /// let terms = vec![
+        ///     RationalExpression::new(x.into(), x + 1),
+        ///     RationalExpression::new(x + 1, 2.into()),
+        ///     RationalExpression::from(3),
+        /// ];
+        /// assert_eq!(terms.into_iter().product::<RationalExpression>(), RationalExpression::new((3 * x).into(), 2.into()));
+        /// assert_eq!(std::iter::empty::<RationalExpression>().product::<RationalExpression>(), 1.into());
+        /// ```
+        fn product<I: Iterator<Item = T>>(iter: I) -> Self {
+            iter.map(|v| v.into()).fold(1.into(), Mul::mul)
+        }
+    }
+
+    impl Sum<Polynomial> for Polynomial {
+        /// Adds polynomials defined over the same variable.
+        ///
+        /// # Panics
+        ///
+        /// Panics if the iterator is empty or contains polynomials defined over
+        /// different variables.
+        ///
+        /// ```
+        /// use tiny_symbolic::*;
+        /// use std::iter::Sum;
+        ///
+        /// let x = Variable::new('x', None);
+        /// let polynomials = vec![
+        ///     Polynomial::new(x, vec![1, 1]),
+        ///     Polynomial::new(x, vec![2, 0, 1]),
+        /// ];
+        ///
+        /// assert_eq!(
+        ///     polynomials.into_iter().sum::<Polynomial>(),
+        ///     Polynomial::new(x, vec![3, 1, 1]),
+        /// );
+        /// ```
+        ///
+        /// ```should_panic
+        /// use tiny_symbolic::*;
+        /// use std::iter::Sum;
+        ///
+        /// let x = Variable::new('x', None);
+        /// let y = Variable::new('y', None);
+        /// let polynomials = vec![
+        ///     Polynomial::new(x, vec![1, 1]),
+        ///     Polynomial::new(y, vec![2, 1]),
+        /// ];
+        ///
+        /// let _: Polynomial = polynomials.into_iter().sum();
+        /// ```
+        fn sum<I: Iterator<Item = Polynomial>>(mut iter: I) -> Self {
+            let first = iter
+                .next()
+                .expect("Cannot sum an empty iterator of polynomials!");
+            iter.fold(first, |acc, polynomial| {
+                if acc.variable != polynomial.variable {
+                    panic!("Cannot sum polynomials with different variables!");
+                }
+                acc + polynomial
+            })
+        }
+    }
+
+    impl Product<Polynomial> for Polynomial {
+        /// Multiplies polynomials defined over the same variable.
+        ///
+        /// # Panics
+        ///
+        /// Panics if the iterator is empty or contains polynomials defined over
+        /// different variables.
+        ///
+        /// ```
+        /// use tiny_symbolic::*;
+        /// use std::iter::Product;
+        ///
+        /// let x = Variable::new('x', None);
+        /// let polynomials = vec![
+        ///     Polynomial::new(x, vec![1, 1]),
+        ///     Polynomial::new(x, vec![2, 0, 1]),
+        /// ];
+        ///
+        /// assert_eq!(
+        ///     polynomials.into_iter().product::<Polynomial>(),
+        ///     Polynomial::new(x, vec![2, 2, 1, 1]),
+        /// );
+        /// ```
+        ///
+        /// ```should_panic
+        /// use tiny_symbolic::*;
+        /// use std::iter::Product;
+        ///
+        /// let x = Variable::new('x', None);
+        /// let y = Variable::new('y', None);
+        /// let polynomials = vec![
+        ///     Polynomial::new(x, vec![1, 1]),
+        ///     Polynomial::new(y, vec![2, 1]),
+        /// ];
+        ///
+        /// let _: Polynomial = polynomials.into_iter().product();
+        /// ```
+        fn product<I: Iterator<Item = Polynomial>>(mut iter: I) -> Self {
+            let first = iter
+                .next()
+                .expect("Cannot multiply an empty iterator of polynomials!");
+            iter.fold(first, |acc, polynomial| {
+                if acc.variable != polynomial.variable {
+                    panic!("Cannot multiply polynomials with different variables!");
+                }
+                acc * polynomial
+            })
         }
     }
 }

@@ -2,7 +2,6 @@ use fmtastic::Superscript;
 use num::Zero;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::Hash;
-use std::iter::Product;
 use std::{fmt::Display, ops::Mul};
 
 use crate::operations::derivative::PartialDerivative;
@@ -369,12 +368,6 @@ where
             variables: Default::default(),
             multiplier: Into::<TermMultiplierType>::into(value),
         }
-    }
-}
-
-impl Product for Term {
-    fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(Self::default(), Mul::mul)
     }
 }
 
