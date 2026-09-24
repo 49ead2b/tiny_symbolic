@@ -19,7 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.0] - 2026-09-23
 
-### Changed
+### Added
 - Add RationalExpression and Polynomial data structure.
-- More checks for undefined operations.
 - Support all arithmetic combinations of Variable, Term, Expression, RationalExpression
+
+### Fixed
+- More checks for undefined operations.
+
+### Changed
+- Change type of power of variables in Term to i64
+
+## [0.3.1] - 2026-09-24
+
+### Added
+- Sum and Product over Iterators for Term, Expression, RationalExpression and Polynomial
