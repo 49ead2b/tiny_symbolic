@@ -1,10 +1,5 @@
 use crate::{operations::derivative::PartialDerivative, *};
-use std::{
-    collections::HashMap,
-    fmt::Display,
-    iter::Sum,
-    ops::{Add, Mul},
-};
+use std::{collections::HashMap, fmt::Display, ops::Mul};
 
 /// Rational expression consisting of a numerator and a denominator, both of which are expression
 /// Since multiplying numerator and denominator with the same thing does not change the value
@@ -55,12 +50,6 @@ where
             numerator: value.into(),
             denominator: 1.into(),
         }
-    }
-}
-
-impl Sum for RationalExpression {
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(Self::default(), Add::add)
     }
 }
 

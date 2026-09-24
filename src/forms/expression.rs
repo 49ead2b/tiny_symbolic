@@ -1,5 +1,5 @@
 use crate::TermMultiplierType;
-use std::{collections::BTreeMap, fmt::Display, iter::Sum, ops::Add};
+use std::{collections::BTreeMap, fmt::Display};
 
 use crate::{
     TermVariablePowerType,
@@ -225,12 +225,6 @@ where
         }
 
         expression
-    }
-}
-
-impl Sum for Expression {
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(Self::default(), Add::add)
     }
 }
 
