@@ -971,6 +971,15 @@ mod binary_operations {
         }
     }
 
+    impl Neg for Polynomial {
+        type Output = Polynomial;
+
+        fn neg(mut self) -> Self::Output {
+            self.coefficients = self.coefficients.into_iter().map(|c| -c).collect();
+            self
+        }
+    }
+
     impl Add<Polynomial> for Polynomial {
         type Output = Polynomial;
 
@@ -1054,6 +1063,73 @@ mod binary_operations {
             expression1 / expression2
         }
     }
+
+    macro_rules! impl_polynomial_expression_operation_for_multiplier {
+        ($trait:ident, $method:ident, $operator:tt) => {
+            impl<T> $trait<T> for Polynomial
+            where T: Into<TermMultiplierType> {
+                type Output = Polynomial;
+
+                fn $method(self, rhs: T) -> Self::Output {
+                    let variable = self.variable;
+                    let expression = Expression::from(self) $operator rhs.into();
+                    Polynomial::from_expression(expression, variable)
+                }
+            }
+        };
+    }
+
+    macro_rules! impl_polynomial_expression_operation {
+        ($trait:ident, $method:ident, $operator:tt, $rhs:ty) => {
+            impl $trait<$rhs> for Polynomial {
+                type Output = Polynomial;
+
+                fn $method(self, rhs: $rhs) -> Self::Output {
+                    let variable = self.variable;
+                    let expression = Expression::from(self) $operator rhs;
+                    Polynomial::from_expression(expression, variable)
+                }
+            }
+        };
+    }
+
+    macro_rules! impl_polynomial_division {
+        ($rhs:ty) => {
+            impl Div<$rhs> for Polynomial {
+                type Output = Polynomial;
+
+                fn div(self, rhs: $rhs) -> Self::Output {
+                    let variable = self.variable;
+                    let divisor = Term::from(rhs);
+                    if divisor.contains_variable(&variable) {
+                        panic!("Divisor cannot contain the polynomial variable. Convert the polynomial to a Expression first!");
+                    }
+                    let expression = Expression::from(self) / divisor;
+                    Polynomial::from_expression(expression, variable)
+                }
+            }
+        };
+    }
+
+    impl_polynomial_expression_operation_for_multiplier!(Add, add, +);
+    impl_polynomial_expression_operation!(Add, add, +, Variable);
+    impl_polynomial_expression_operation!(Add, add, +, Term);
+    impl_polynomial_expression_operation!(Add, add, +, Expression);
+
+    impl_polynomial_expression_operation_for_multiplier!(Sub, sub, -);
+    impl_polynomial_expression_operation!(Sub, sub, -, Variable);
+    impl_polynomial_expression_operation!(Sub, sub, -, Term);
+    impl_polynomial_expression_operation!(Sub, sub, -, Expression);
+
+    impl_polynomial_expression_operation_for_multiplier!(Mul, mul, *);
+    impl_polynomial_expression_operation!(Mul, mul, *, Variable);
+    impl_polynomial_expression_operation!(Mul, mul, *, Term);
+    impl_polynomial_expression_operation!(Mul, mul, *, Expression);
+
+    impl_polynomial_expression_operation_for_multiplier!(Div, div, /);
+    impl_polynomial_division!(Variable);
+    impl_polynomial_division!(Term);
+    // impl_polynomial_division!(Expression);
 
     macro_rules! implement_traits_on_numeric_types
     {
@@ -1245,6 +1321,23 @@ mod binary_operations {
             let _ = rational.clone() / expression.clone();
             let _ = rational.clone() / rational.clone();
 
+            let _ = -polynomial.clone();
+            let _ = polynomial.clone() + scalar;
+            let _ = polynomial.clone() + y;
+            let _ = polynomial.clone() + term.clone();
+            let _ = polynomial.clone() + expression.clone();
+            let _ = polynomial.clone() - scalar;
+            let _ = polynomial.clone() - y;
+            let _ = polynomial.clone() - term.clone();
+            let _ = polynomial.clone() - expression.clone();
+            let _ = polynomial.clone() * scalar;
+            let _ = polynomial.clone() * y;
+            let _ = polynomial.clone() * term.clone();
+            let _ = polynomial.clone() * expression.clone();
+            let _ = polynomial.clone() / scalar;
+            let _ = polynomial.clone() / y;
+            let _ = polynomial.clone() / Term::from(y);
+            // let _ = polynomial.clone() / (y + 1);
             let _ = polynomial.clone() + polynomial.clone();
             let _ = polynomial.clone() - polynomial.clone();
             let _ = polynomial.clone() * polynomial.clone();
@@ -1292,6 +1385,15 @@ mod binary_operations {
             let _ = 5 / term.clone();
             let _ = 5 / expression.clone();
             let _ = 5 / rational.clone();
+        }
+
+        #[test]
+        #[should_panic(expected = "Polynomial divisor cannot contain the polynomial variable!")]
+        fn test_polynomial_division_by_own_variable_panics() {
+            let x = Variable::new('x', None);
+            let polynomial = Polynomial::new(x, vec![1, 1]);
+
+            let _ = polynomial / x;
         }
     }
 }

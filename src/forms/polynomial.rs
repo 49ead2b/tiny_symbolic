@@ -154,6 +154,16 @@ impl Polynomial {
             expression,
         )))
     }
+
+    /// Raise Polynomial to a positive power
+    /// For negative powers, convert to an expression first
+    pub fn pow(self, n: u64) -> Polynomial {
+        let variable = self.variable;
+        Polynomial::from_expression(
+            Expression::from(self).pow(n as TermVariablePowerType),
+            variable,
+        )
+    }
 }
 
 impl Display for Polynomial {
