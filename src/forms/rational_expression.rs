@@ -41,6 +41,20 @@ impl TryInto<Expression> for RationalExpression {
     }
 }
 
+impl TryInto<Term> for RationalExpression {
+    type Error = String;
+
+    fn try_into(self) -> Result<Term, Self::Error> {
+        if let Ok(expression) = TryInto::<Expression>::try_into(self)
+            && let Ok(term) = TryInto::<Term>::try_into(expression)
+        {
+            return Ok(term);
+        }
+
+        Err("Cannot be reduced to a term!".to_string())
+    }
+}
+
 impl<T> From<T> for RationalExpression
 where
     T: Into<Expression>,

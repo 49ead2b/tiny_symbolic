@@ -2,11 +2,13 @@ use std::fmt::Display;
 
 use crate::{algos::ElementarySymmetricPolynomials, operations::derivative::PartialDerivative, *};
 
+type PolynomialCoefficientType = Expression;
+
 /// A polynomial consisting of expression coefficients and a variable raised to a successive power.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Polynomial {
     pub(super) variable: Variable,
-    pub(super) coefficients: Vec<Expression>,
+    pub(super) coefficients: Vec<PolynomialCoefficientType>,
     pub(super) order: usize,
 }
 
@@ -15,8 +17,12 @@ impl Polynomial {
     /// The coefficients are in order of increasing power of the variable.
     /// Leading coefficient cannot be zero, and if the coefficients vector is empty,
     /// the polynomial is considered to be the zero polynomial.
-    pub fn new(variable: Variable, coefficients: Vec<impl Into<Expression>>) -> Self {
-        let coefficients: Vec<Expression> = coefficients.into_iter().map(|ex| ex.into()).collect();
+    pub fn new(
+        variable: Variable,
+        coefficients: Vec<impl Into<PolynomialCoefficientType>>,
+    ) -> Self {
+        let coefficients: Vec<PolynomialCoefficientType> =
+            coefficients.into_iter().map(|ex| ex.into()).collect();
         if coefficients.len() > 1 && coefficients.last().is_some_and(|ex| ex.is_zero()) {
             panic!("Leading coefficient cannot be zero!");
         }
@@ -76,7 +82,8 @@ impl Polynomial {
     /// Constructs an ElementarySymmetricPolynomials object for the roots of the polynomial, using a specified variable to represent the roots.
     /// For Example, if 'root_variable is 'x', then roots will be represented as x₁, x₂, ... xₙ when n is the order of the polynomial.
     pub fn construct_esc_for_roots(&self, root_variable: char) -> ElementarySymmetricPolynomials {
-        let leading_coeff: Term = match self.coefficients.last().unwrap().clone().try_into() {
+        let leading_coeff = self.coefficients.last().unwrap().clone();
+        let leading_coeff: Term = match TryInto::<Term>::try_into(leading_coeff) {
             Ok(term) => term,
             Err(_) => panic!("Leading coefficient is a expression!"),
         };
@@ -153,6 +160,21 @@ impl Polynomial {
             self.variable,
             expression,
         )))
+    }
+
+    /// Raise Polynomial to a positive power
+    /// For negative powers, convert to an expression first
+    pub fn pow(self, n: u64) -> Polynomial {
+        let variable = self.variable;
+        Polynomial::from_expression(
+            Expression::from(self).pow(n as TermVariablePowerType),
+            variable,
+        )
+    }
+
+    /// Get coefficients and variables
+    pub fn dissolve(self) -> (Vec<PolynomialCoefficientType>, Variable) {
+        (self.coefficients, self.variable)
     }
 }
 
