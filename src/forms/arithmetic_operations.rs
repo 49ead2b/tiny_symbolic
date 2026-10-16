@@ -401,6 +401,8 @@ mod binary_operations {
 
     impl_commutative_op!(Add::add, +, Variable, RationalExpression, RationalExpression);
 
+    impl_commutative_op!(Add::add, +, Variable, Polynomial, Polynomial);
+
     impl<T> Sub<T> for Variable
     where
         T: Into<TermMultiplierType>,
@@ -444,6 +446,14 @@ mod binary_operations {
         }
     }
 
+    impl Sub<Polynomial> for Variable {
+        type Output = Polynomial;
+
+        fn sub(self, rhs: Polynomial) -> Self::Output {
+            -(rhs - self)
+        }
+    }
+
     impl<T> Mul<T> for Variable
     where
         T: Into<TermMultiplierType>,
@@ -468,6 +478,8 @@ mod binary_operations {
     impl_commutative_op!(Mul::mul, *, Variable, Expression, Expression);
 
     impl_commutative_op!(Mul::mul, *, Variable, RationalExpression, RationalExpression);
+
+    impl_commutative_op!(Mul::mul, *, Variable, Polynomial, Polynomial);
 
     impl<T> Div<T> for Variable
     where
@@ -552,6 +564,8 @@ mod binary_operations {
 
     impl_commutative_op!(Add::add, +, Term, RationalExpression, RationalExpression);
 
+    impl_commutative_op!(Add::add, +, Term, Polynomial, Polynomial);
+
     impl<T> Sub<T> for Term
     where
         T: Into<TermMultiplierType>,
@@ -595,6 +609,14 @@ mod binary_operations {
         }
     }
 
+    impl Sub<Polynomial> for Term {
+        type Output = Polynomial;
+
+        fn sub(self, rhs: Polynomial) -> Self::Output {
+            -(rhs - self)
+        }
+    }
+
     impl<T> Mul<T> for Term
     where
         T: Into<TermMultiplierType>,
@@ -628,6 +650,8 @@ mod binary_operations {
     impl_commutative_op!(Mul::mul, *, Term, Expression, Expression);
 
     impl_commutative_op!(Mul::mul, *, Term, RationalExpression, RationalExpression);
+
+    impl_commutative_op!(Mul::mul, *, Term, Polynomial, Polynomial);
 
     impl<T> Div<T> for Term
     where
@@ -725,6 +749,8 @@ mod binary_operations {
 
     impl_commutative_op!(Add::add, +, Expression, RationalExpression, RationalExpression);
 
+    impl_commutative_op!(Add::add, +, Expression, Polynomial, Polynomial);
+
     impl<T> Sub<T> for Expression
     where
         T: Into<TermMultiplierType>,
@@ -766,6 +792,14 @@ mod binary_operations {
         type Output = RationalExpression;
 
         fn sub(self, rhs: RationalExpression) -> Self::Output {
+            -(rhs - self)
+        }
+    }
+
+    impl Sub<Polynomial> for Expression {
+        type Output = Polynomial;
+
+        fn sub(self, rhs: Polynomial) -> Self::Output {
             -(rhs - self)
         }
     }
@@ -820,6 +854,8 @@ mod binary_operations {
     }
 
     impl_commutative_op!(Mul::mul, *, Expression, RationalExpression, RationalExpression);
+
+    impl_commutative_op!(Mul::mul, *, Expression, Polynomial, Polynomial);
 
     impl<T> Div<T> for Expression
     where
@@ -1388,7 +1424,9 @@ mod binary_operations {
         }
 
         #[test]
-        #[should_panic(expected = "Polynomial divisor cannot contain the polynomial variable!")]
+        #[should_panic(
+            expected = "Divisor cannot contain the polynomial variable. Convert the polynomial to a Expression first!"
+        )]
         fn test_polynomial_division_by_own_variable_panics() {
             let x = Variable::new('x', None);
             let polynomial = Polynomial::new(x, vec![1, 1]);
