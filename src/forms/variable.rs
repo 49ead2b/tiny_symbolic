@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use fmtastic::Subscript;
 
 use crate::*;
@@ -33,22 +31,11 @@ impl Variable {
             format!("{}", self.name)
         }
     }
-    /// Returns the variable's SymPy-compatible string representation.
-    pub fn to_string_sympy(&self) -> String {
-        self.to_string_internal(true)
-    }
-}
-
-impl Display for Variable {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let output = self.to_string_internal(false);
-        write!(f, "{}", output)
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::TermMultiplierType;
+    use crate::{TermMultiplierType, forms::basic_traits::Form};
 
     use super::*;
 

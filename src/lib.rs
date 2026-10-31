@@ -11,12 +11,20 @@ pub type TermMultiplierType = Rational64;
 pub mod algos;
 /// Module for the fundamental structs for symbolic computation
 pub mod forms;
+/// Module for the common functions.
+pub mod functions;
 /// Module for fundamental mathematical operations
 pub mod operations;
 
 pub use forms::{
-    expression::Expression, polynomial::Polynomial, rational_expression::RationalExpression,
-    term::Term, variable::Variable,
+    expression::Expression, rational_expression::RationalExpression, term::Term, variable::Variable,
 };
+
+pub use forms::basic_operations::{
+    arithmetic_operations::assignment_operations, arithmetic_operations::binary_operations,
+    arithmetic_operations::cumulative_operations, substitution_operations,
+};
+
+pub use forms::basic_traits::{Form, IsStandardScalar};
 
 pub use num::*;

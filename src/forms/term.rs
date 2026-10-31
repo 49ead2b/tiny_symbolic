@@ -2,9 +2,8 @@ use fmtastic::Superscript;
 use num::Zero;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::Hash;
-use std::{fmt::Display, ops::Mul};
+use std::ops::Mul;
 
-use crate::operations::derivative::PartialDerivative;
 use crate::*;
 
 /// A symbolic term consisting of a rational multiplier and a product of variables raised to integer exponents.
@@ -79,13 +78,6 @@ impl Term {
         data
     }
 
-    /// Returns the term's SymPy-compatible string representation.
-    pub fn to_string_sympy(&self) -> String {
-        let variables = self.variables();
-        let multiplier = self.multiplier();
-        Term::to_string_internal(variables, multiplier, true)
-    }
-
     pub(super) fn dissolve(
         self,
     ) -> (
@@ -150,23 +142,6 @@ impl Term {
         self
     }
 
-    /// Substitutes a variable raised to a `power` with an expression.
-    pub fn substitute_variable_power_with_expression(
-        mut self,
-        variable: Variable,
-        power: TermVariablePowerType,
-        subst: Expression,
-    ) -> Expression {
-        if let Some(current_power) = self.variables.get_mut(&variable) {
-            let (q, r) = num_integer::div_rem(*current_power, power);
-            self.variables.remove(&variable);
-
-            subst.pow(q) * variable.pow(r) * self
-        } else {
-            self.into()
-        }
-    }
-
     /// Substitutes multiple variables with corresponding term.
     pub fn substitute_multiple_variables_with_terms<T, U>(mut self, substitutions: T) -> Self
     where
@@ -196,6 +171,29 @@ impl Term {
         T: IntoIterator<Item = (Variable, Expression)>,
     {
         let mut substituted_expression = Into::<Expression>::into(Term::default());
+
+        let mut seen = HashSet::new();
+        for (variable, value) in substitutions.into_iter() {
+            if !seen.insert(variable) {
+                panic!("Duplicate substitutions found for {variable}!");
+            }
+            if let Some(power) = self.variables.remove(&variable) {
+                substituted_expression *= value.pow(power);
+            }
+        }
+
+        substituted_expression * self
+    }
+
+    /// Substitutes multiple variables with corresponding expressions.
+    pub fn substitute_multiple_variables_with_rational_expressions<T>(
+        mut self,
+        substitutions: T,
+    ) -> RationalExpression
+    where
+        T: IntoIterator<Item = (Variable, RationalExpression)>,
+    {
+        let mut substituted_expression = Into::<RationalExpression>::into(Term::default());
 
         let mut seen = HashSet::new();
         for (variable, value) in substitutions.into_iter() {
@@ -309,94 +307,10 @@ impl Term {
     }
 }
 
-impl Default for Term {
-    fn default() -> Self {
-        Self {
-            variables: Default::default(),
-            multiplier: TermMultiplierType::new(1, 1),
-        }
-    }
-}
-
-impl Display for Term {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let variables = self.variables();
-        let multiplier = self.multiplier();
-
-        write!(
-            f,
-            "{}",
-            Term::to_string_internal(variables, multiplier, false)
-        )
-    }
-}
-
-impl From<Variable> for Term {
-    fn from(value: Variable) -> Self {
-        let mut term = Self::default();
-        term.variables.insert(value, 1);
-        term
-    }
-}
-
-impl TryInto<Variable> for Term {
-    type Error = String;
-
-    fn try_into(self) -> Result<Variable, Self::Error> {
-        let mut variable_powers = self
-            .variables
-            .into_iter()
-            .filter(|(_, power)| *power != 0)
-            .collect::<Vec<_>>();
-        if self.multiplier != 1.into()
-            || variable_powers.len() != 1
-            || variable_powers.first().expect("Check Length above").1 != 0
-        {
-            Err("Cannot be reduced to a variable!".to_string())
-        } else {
-            Ok(variable_powers.pop().expect("Check Length above").0)
-        }
-    }
-}
-
-impl<T> From<T> for Term
-where
-    T: Into<TermMultiplierType>,
-{
-    fn from(value: T) -> Self {
-        Self {
-            variables: Default::default(),
-            multiplier: Into::<TermMultiplierType>::into(value),
-        }
-    }
-}
-
-impl PartialDerivative for Term {
-    fn calculate_derivate_wrt_variable(&self, variable: &Variable) -> Self {
-        let mut output = self.clone();
-        let mut residue = output.remove_variables(std::iter::once(variable));
-        let power = residue.get_power_of_variable(variable);
-        residue.set_power_of_variable(variable, power - 1);
-        residue *= TermMultiplierType::from(power as TermVariablePowerType);
-        residue * output
-    }
-    fn calculate_nth_derivate_wrt_variable(&self, n: usize, variable: &Variable) -> Self {
-        let mut output = self.clone();
-        let mut residue = output.remove_variables(std::iter::once(variable));
-        let power = residue.get_power_of_variable(variable);
-        let smallest = power - n as TermVariablePowerType;
-        let mut multiplier = 1;
-        for m in (smallest + 1)..=power {
-            multiplier *= m;
-        }
-        residue.set_power_of_variable(variable, smallest);
-        residue *= TermMultiplierType::from(multiplier);
-        residue * output
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::forms::basic_traits::Form;
+
     use super::*;
 
     #[test]
@@ -529,9 +443,10 @@ mod tests {
         let z = Variable::new('z', None);
         let term = 4 * x.pow(4) * y;
 
-        let substituted =
-            term.clone()
-                .substitute_variable_power_with_expression(x, 3, 5 * z.pow(2) + z);
+        let substituted = substitution_operations::VariablePowerSubstitutions::<
+            Expression,
+            Expression,
+        >::substitute_variable_power(term.clone(), x, 3, 5 * z.pow(2) + z);
         assert_eq!(substituted.to_string(), "4xyz + 20xyz²");
 
         let term = 3 * x.pow(4) * y * z.pow(3);
@@ -561,9 +476,10 @@ mod tests {
         let z = Variable::new('z', None);
         let term = 4 * x.pow(8);
 
-        let _ = term
-            .clone()
-            .substitute_variable_power_with_expression(x, -2, 5 * z.pow(2) + z);
+        let _ = substitution_operations::VariablePowerSubstitutions::<
+            Expression,
+            Expression,
+        >::substitute_variable_power(term.clone(), x, -2, 5 * z.pow(2) + z);
     }
 
     #[test]

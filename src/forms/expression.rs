@@ -1,11 +1,6 @@
-use crate::TermMultiplierType;
-use std::{collections::BTreeMap, fmt::Display};
+use std::collections::BTreeMap;
 
-use crate::{
-    TermVariablePowerType,
-    forms::{term::Term, variable::Variable},
-    operations::derivative::PartialDerivative,
-};
+use crate::*;
 
 /// A symbolic expression consisting of a sum of terms.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
@@ -63,50 +58,6 @@ impl Expression {
         }
     }
 
-    /// Substitutes multiple variables with provided corresponding expressions.
-    pub fn substitute_multiple_variables_with_expressions<T, U>(self, substitutions: T) -> Self
-    where
-        T: IntoIterator<Item = (Variable, U)>,
-        U: Into<Expression>,
-    {
-        let to_be_substituted_expressions = substitutions
-            .into_iter()
-            .map(|(variable, expression)| (variable, Into::<Expression>::into(expression)))
-            .collect::<Vec<_>>();
-        let mut expression = Expression::default();
-        let terms = self.dissolve_into_terms();
-        for term in terms {
-            let term = term.substitute_multiple_variables_with_expressions(
-                to_be_substituted_expressions.clone(),
-            );
-            expression += term;
-        }
-
-        expression
-    }
-
-    /// Substitutes a variable raised to a power with a provided expression.
-    pub fn substitute_variable_power_with_expression(
-        self,
-        variable: Variable,
-        known_power: TermVariablePowerType,
-        subst: Expression,
-    ) -> Expression {
-        let mut expression = Expression::default();
-
-        let terms = self.dissolve_into_terms();
-        for term in terms {
-            let term = term.substitute_variable_power_with_expression(
-                variable,
-                known_power,
-                subst.clone(),
-            );
-            expression += term;
-        }
-
-        expression
-    }
-
     /// Get iterator of the terms composing the expression
     pub fn terms(&self) -> impl IntoIterator<Item = Term> {
         self.terms
@@ -149,11 +100,6 @@ impl Expression {
         self.terms.len() <= 1
     }
 
-    /// Returns the expression's SymPy-compatible string representation.
-    pub fn to_string_sympy(&self) -> String {
-        self.to_string_internal(true)
-    }
-
     pub(super) fn to_string_internal(&self, is_sympy: bool) -> String {
         if self.terms.is_empty() {
             return "0".to_string();
@@ -190,65 +136,10 @@ impl Expression {
     }
 }
 
-impl Display for Expression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let output = self.to_string_internal(false);
-        write!(f, "{output}")
-    }
-}
-
-impl TryInto<Term> for Expression {
-    type Error = String;
-
-    fn try_into(self) -> Result<Term, Self::Error> {
-        let mut terms = self.dissolve_into_terms();
-        if terms.is_empty() {
-            Ok(0.into())
-        } else if terms.len() == 1 {
-            Ok(terms.pop().unwrap())
-        } else {
-            Err("Cannot be reduced to a term!".to_string())
-        }
-    }
-}
-
-impl<T> From<T> for Expression
-where
-    T: Into<Term>,
-{
-    fn from(value: T) -> Self {
-        let value = value.into();
-        let (variables, multiplier) = value.dissolve();
-        let mut expression = Self::default();
-        if multiplier != 0.into() {
-            expression.terms.insert(variables, multiplier);
-        }
-
-        expression
-    }
-}
-
-impl PartialDerivative for Expression {
-    fn calculate_derivate_wrt_variable(&self, variable: &Variable) -> Self {
-        let mut output = Expression::default();
-        let terms = self.clone().dissolve_into_terms();
-        for term in terms {
-            output += term.calculate_derivate_wrt_variable(variable);
-        }
-        output
-    }
-    fn calculate_nth_derivate_wrt_variable(&self, n: usize, variable: &Variable) -> Self {
-        let mut output = Expression::default();
-        let terms = self.clone().dissolve_into_terms();
-        for term in terms {
-            output += term.calculate_nth_derivate_wrt_variable(n, variable);
-        }
-        output
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::{forms::basic_traits::Form, operations::derivative::PartialDerivative};
+
     use super::*;
     use fmtastic::Superscript;
 
@@ -429,8 +320,10 @@ mod tests {
         let y = Variable::new('y', None);
         let expression = x.pow(4) + y;
 
-        let substituted =
-            expression.substitute_variable_power_with_expression(x, 2, y.pow(2).into());
+        let substituted = substitution_operations::VariablePowerSubstitutions::<
+            Expression,
+            Expression,
+        >::substitute_variable_power(expression, x, 2, y.pow(2).into());
 
         assert_eq!(substituted.to_string(), "y + y⁴");
     }
@@ -444,15 +337,21 @@ mod tests {
 
         let expression = x.pow(4) + y;
 
-        let substituted = expression
-            .clone()
-            .substitute_multiple_variables_with_expressions([(x, 2 + y.pow(2)), (y, 2 + z.pow(2))]);
+        let substituted = <Expression as substitution_operations::VariableSubstitutions<
+            Expression,
+            Expression,
+        >>::substitute_variables(
+            expression.clone(), [(x, 2 + y.pow(2)), (y, 2 + z.pow(2))]
+        );
 
         assert_eq!(substituted.to_string(), "18 + 32y² + 24y⁴ + 8y⁶ + y⁸ + z²");
 
-        let _ = expression
-            .clone()
-            .substitute_multiple_variables_with_expressions([(x, 2 + y.pow(2)), (x, z.into())]);
+        let _ = <Expression as substitution_operations::VariableSubstitutions<
+            Expression,
+            Expression,
+        >>::substitute_variables(
+            expression.clone(), [(x, 2 + y.pow(2)), (x, z.into())]
+        );
     }
 
     #[test]
