@@ -10,34 +10,23 @@ pub struct Expression {
 
 impl Expression {
     pub(super) fn to_string_internal(&self, is_sympy: bool) -> String {
-        if self.terms.is_empty() {
+        if self.is_zero() {
             return "0".to_string();
         }
 
-        let mut terms_iter = self.terms.iter();
-        let (first_variables, first_multiplier) = terms_iter.next().unwrap();
-        let mut output = if *first_multiplier < 0.into() {
-            format!(
-                "-{}",
-                Term::to_string_internal(first_variables, -(*first_multiplier), is_sympy)
-            )
+        let mut terms_iter = self.terms();
+        let first_term = terms_iter.next().unwrap();
+        let mut output = if first_term.multiplier() < 0.into() {
+            format!("-{}", (-first_term).to_string_internal(is_sympy))
         } else {
-            Term::to_string_internal(first_variables, *first_multiplier, is_sympy)
+            first_term.to_string_internal(is_sympy)
         };
 
-        for (variables, multiplier) in terms_iter {
-            if *multiplier < 0.into() {
-                output = format!(
-                    "{} - {}",
-                    output,
-                    Term::to_string_internal(variables, -(*multiplier), is_sympy)
-                );
+        for term in terms_iter {
+            if term.multiplier() < 0.into() {
+                output = format!("{} - {}", output, (-term).to_string_internal(is_sympy));
             } else {
-                output = format!(
-                    "{} + {}",
-                    output,
-                    Term::to_string_internal(variables, *multiplier, is_sympy)
-                );
+                output = format!("{} + {}", output, term.to_string_internal(is_sympy));
             }
         }
 
@@ -89,7 +78,7 @@ impl Expression {
     }
 
     /// Get iterator of the terms composing the expression
-    pub fn terms(&self) -> impl IntoIterator<Item = Term> {
+    pub fn terms(&self) -> impl Iterator<Item = Term> {
         self.terms
             .iter()
             .map(|(variables, multiplier)| Term::from_btreemap(variables.clone(), *multiplier))
@@ -120,11 +109,6 @@ impl Expression {
         self.terms.keys().any(|term| term.contains_key(variable))
     }
 
-    /// Returns true if the expression is a scalar (i.e., it has no variables).
-    pub fn is_scalar(&self) -> bool {
-        self.terms().into_iter().all(|p| p.is_scalar())
-    }
-
     /// Returns true if the expression is a term (i.e., it has at most one term).
     pub fn is_term(&self) -> bool {
         self.terms.len() <= 1
@@ -133,7 +117,10 @@ impl Expression {
 
 #[cfg(test)]
 mod tests {
-    use crate::{forms::basic_traits::Form, operations::derivative::PartialDerivative};
+    use crate::{
+        forms::basic_traits::{Form, IsScalar},
+        operations::derivative::PartialDerivative,
+    };
 
     use super::*;
     use fmtastic::Superscript;

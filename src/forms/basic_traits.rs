@@ -26,9 +26,7 @@ impl Form for Variable {
 
 impl Form for Term {
     fn to_string_sympy(&self) -> String {
-        let variables = self.variables_map();
-        let multiplier = self.multiplier();
-        Term::to_string_internal(variables, multiplier, true)
+        self.to_string_internal(true)
     }
 }
 
@@ -45,16 +43,48 @@ impl Form for RationalExpression {
 }
 
 /**
+ * Common trait for to check if form is a scalar.
+ */
+pub trait IsScalar {
+    /// Returns true when the value is scalar.
+    fn is_scalar(&self) -> bool;
+}
+
+impl IsScalar for Rational64 {
+    fn is_scalar(&self) -> bool {
+        true
+    }
+}
+
+impl IsScalar for Term {
+    fn is_scalar(&self) -> bool {
+        self.variables.values().all(|p| *p == 0)
+    }
+}
+
+impl IsScalar for Expression {
+    fn is_scalar(&self) -> bool {
+        self.terms().all(|t| t.is_scalar())
+    }
+}
+
+impl IsScalar for RationalExpression {
+    fn is_scalar(&self) -> bool {
+        self.numerator.is_scalar() && self.denominator.is_scalar()
+    }
+}
+
+/**
  * Common trait for scalar-like values that can be compared to zero or one.
  */
-pub trait IsStandardScalar {
+pub trait IsStandardScalar: IsScalar {
     /// Returns true when the value is the additive identity.
     fn is_zero(&self) -> bool;
     /// Returns true when the value is the multiplicative identity.
     fn is_unity(&self) -> bool;
 }
 
-impl<T: Eq + From<Rational64> + Form> IsStandardScalar for T {
+impl<T: Eq + From<Rational64> + Form + IsScalar> IsStandardScalar for T {
     fn is_zero(&self) -> bool {
         *self == T::from(0.into())
     }
@@ -73,14 +103,7 @@ impl Display for Variable {
 
 impl Display for Term {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let variables = self.variables_map();
-        let multiplier = self.multiplier();
-
-        write!(
-            f,
-            "{}",
-            Term::to_string_internal(variables, multiplier, false)
-        )
+        write!(f, "{}", self.to_string_internal(false))
     }
 }
 

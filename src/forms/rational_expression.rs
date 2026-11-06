@@ -41,11 +41,6 @@ impl RationalExpression {
         (self.numerator, self.denominator)
     }
 
-    /// Is rational expression just 0
-    pub fn is_zero(&self) -> bool {
-        self.numerator.is_zero()
-    }
-
     /// Raises this rational expression to a power
     pub fn pow(self, power: TermVariablePowerType) -> Self {
         if power == 0 {
@@ -63,11 +58,6 @@ impl RationalExpression {
     /// Returns true if the rational expression contains the specified variable.
     pub fn contains_variable(&self, variable: &Variable) -> bool {
         self.numerator.contains_variable(variable) || self.denominator.contains_variable(variable)
-    }
-
-    /// Returns true if the rational expression is a scalar (i.e., it has no variables).
-    pub fn is_scalar(&self) -> bool {
-        self.numerator.is_scalar() && self.denominator.is_scalar()
     }
 
     fn get_term_to_set_power_sign(expression: &Expression, is_positive: bool) -> Term {
@@ -145,7 +135,10 @@ impl RationalExpression {
 mod tests {
     use num::traits::Inv;
 
-    use crate::{forms::basic_traits::Form, operations::derivative::PartialDerivative};
+    use crate::{
+        forms::basic_traits::{Form, IsScalar},
+        operations::derivative::PartialDerivative,
+    };
 
     use super::*;
 

@@ -17,11 +17,9 @@ impl Term {
         &self.variables
     }
 
-    pub(super) fn to_string_internal(
-        variables: &BTreeMap<Variable, TermVariablePowerType>,
-        multiplier: TermMultiplierType,
-        is_sympy: bool,
-    ) -> String {
+    pub(super) fn to_string_internal(&self, is_sympy: bool) -> String {
+        let variables = &self.variables;
+        let multiplier = &self.multiplier;
         if *multiplier.numer() == 0 {
             return "0".into();
         }
@@ -95,9 +93,11 @@ impl Term {
         }
     }
 
-    /// Returns the rational multiplier of the term.
-    pub fn variables(&self) -> impl Iterator<Item = (&Variable, &TermVariablePowerType)> {
-        self.variables.iter()
+    /// Returns the variables in the term.
+    pub fn variables(&self) -> impl Iterator<Item = Variable> {
+        self.variables
+            .iter()
+            .filter_map(|(v, p)| if *p != 0 { Some(*v) } else { None })
     }
 
     /// Returns the rational multiplier of the term.
@@ -181,11 +181,6 @@ impl Term {
         }
     }
 
-    /// Return true if the term is a scalar (i.e., it has no variables).
-    pub fn is_scalar(&self) -> bool {
-        self.variables.values().all(|p| *p == 0)
-    }
-
     /// Removes the specified variables from the term and returns a new term containing only the removed variables and their powers.
     pub fn remove_variables<'a>(&mut self, variables: impl Iterator<Item = &'a Variable>) -> Self {
         let mut residue = Term::default();
@@ -230,7 +225,7 @@ impl Term {
 
 #[cfg(test)]
 mod tests {
-    use crate::forms::basic_traits::Form;
+    use crate::forms::basic_traits::{Form, IsScalar};
 
     use super::*;
 

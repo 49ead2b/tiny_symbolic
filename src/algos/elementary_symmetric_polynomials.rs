@@ -171,8 +171,8 @@ impl<T: PolynomialCoefficient> ElementarySymmetricPolynomials<T> {
     /// Extract the exponent pattern of a term, keeping only the variables in this system.
     fn power_pattern_for_term(&self, term: &Term) -> Vec<TermVariablePowerType> {
         term.variables()
-            .filter(|(variable, _)| self.variables.contains(*variable))
-            .map(|(variable, _)| term.get_power_of_variable(variable))
+            .filter(|variable| self.variables.contains(variable))
+            .map(|variable| term.get_power_of_variable(&variable))
             .sorted()
             .rev()
             .collect()
@@ -317,7 +317,6 @@ impl<T: PolynomialCoefficient> ElementarySymmetricPolynomials<T> {
     fn get_min_power_in_expression(&self, input: &Expression) -> TermVariablePowerType {
         input
             .terms()
-            .into_iter()
             .map(|term| {
                 self.variables
                     .iter()
