@@ -1,5 +1,5 @@
-use crate::{operations::derivative::PartialDerivative, *};
-use std::{collections::HashMap, fmt::Display, ops::Mul};
+use crate::*;
+use std::{collections::HashMap, ops::Mul};
 
 /// Rational expression consisting of a numerator and a denominator, both of which are expression
 /// Since multiplying numerator and denominator with the same thing does not change the value
@@ -11,85 +11,15 @@ pub struct RationalExpression {
     pub(super) denominator: Expression,
 }
 
-impl Display for RationalExpression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let output = self.to_string_internal(false);
-        write!(f, "{output}")
-    }
-}
-
-impl Default for RationalExpression {
-    fn default() -> Self {
-        Self {
-            numerator: Expression::default(),
-            denominator: 1.into(),
-        }
-    }
-}
-
-impl TryInto<Expression> for RationalExpression {
-    type Error = String;
-
-    fn try_into(self) -> Result<Expression, Self::Error> {
-        let (numerator, denominator) = self.dissolve_into_numerator_and_denominator();
-        if denominator.is_term() && denominator != 0.into() {
-            let denominator: Term = denominator.try_into().unwrap();
-            Ok(numerator / denominator)
-        } else {
-            Err("Cannot be reduced to a expression!".to_string())
-        }
-    }
-}
-
-impl TryInto<Term> for RationalExpression {
-    type Error = String;
-
-    fn try_into(self) -> Result<Term, Self::Error> {
-        if let Ok(expression) = TryInto::<Expression>::try_into(self)
-            && let Ok(term) = TryInto::<Term>::try_into(expression)
-        {
-            return Ok(term);
-        }
-
-        Err("Cannot be reduced to a term!".to_string())
-    }
-}
-
-impl<T> From<T> for RationalExpression
-where
-    T: Into<Expression>,
-{
-    fn from(value: T) -> Self {
-        Self {
-            numerator: value.into(),
-            denominator: 1.into(),
-        }
-    }
-}
-
-impl PartialEq for RationalExpression {
-    fn eq(&self, other: &Self) -> bool {
-        let (s_num, s_den) = self.clone().dissolve_into_numerator_and_denominator();
-        let (o_num, o_den) = other.clone().dissolve_into_numerator_and_denominator();
-        s_num * o_den == s_den * o_num
-    }
-}
-
-impl PartialDerivative for RationalExpression {
-    fn calculate_derivate_wrt_variable(&self, variable: &Variable) -> Self {
-        let (numerator, denominator) = self.clone().dissolve_into_numerator_and_denominator();
-        let numerator_derivative = numerator.calculate_derivate_wrt_variable(variable);
-        let denominator_derivative = denominator.calculate_derivate_wrt_variable(variable);
-
-        let new_numerator =
-            numerator_derivative * denominator.clone() - numerator.clone() * denominator_derivative;
-        let new_denominator = denominator.pow(2);
-
-        Self::new(new_numerator, new_denominator)
-    }
-}
-
 impl RationalExpression {
+    pub(super) fn to_string_internal(&self, is_sympy: bool) -> String {
+        format!(
+            "({})/({})",
+            self.numerator.to_string_internal(is_sympy),
+            self.denominator.to_string_internal(is_sympy)
+        )
+    }
+
     /// Creates a new rational expression with the given numerator and denominator.
     pub fn new(numerator: Expression, denominator: Expression) -> Self {
         if denominator.is_zero() {
@@ -111,11 +41,6 @@ impl RationalExpression {
         (self.numerator, self.denominator)
     }
 
-    /// Is rational expression just 0
-    pub fn is_zero(&self) -> bool {
-        self.numerator.is_zero()
-    }
-
     /// Raises this rational expression to a power
     pub fn pow(self, power: TermVariablePowerType) -> Self {
         if power == 0 {
@@ -130,60 +55,15 @@ impl RationalExpression {
         }
     }
 
-    /// Substitutes multiple variables with provided corresponding expressions.
-    pub fn substitute_multiple_variables_with_expressions<T, U>(self, substitutions: T) -> Self
-    where
-        T: IntoIterator<Item = (Variable, U)>,
-        U: Into<Expression>,
-    {
-        let substitutions: Vec<(Variable, Expression)> = substitutions
-            .into_iter()
-            .map(|(var, expr)| (var, expr.into()))
-            .collect();
-
-        Self::new(
-            self.numerator
-                .substitute_multiple_variables_with_expressions(substitutions.clone()),
-            self.denominator
-                .substitute_multiple_variables_with_expressions(substitutions.clone()),
-        )
-    }
-
-    /// Substitutes a variable raised to a power with a provided expression.
-    pub fn substitute_variable_power_with_expression(
-        self,
-        variable: Variable,
-        known_power: TermVariablePowerType,
-        subst: Expression,
-    ) -> RationalExpression {
-        Self::new(
-            self.numerator.substitute_variable_power_with_expression(
-                variable,
-                known_power,
-                subst.clone(),
-            ),
-            self.denominator.substitute_variable_power_with_expression(
-                variable,
-                known_power,
-                subst.clone(),
-            ),
-        )
-    }
-
     /// Returns true if the rational expression contains the specified variable.
     pub fn contains_variable(&self, variable: &Variable) -> bool {
         self.numerator.contains_variable(variable) || self.denominator.contains_variable(variable)
     }
 
-    /// Returns true if the rational expression is a scalar (i.e., it has no variables).
-    pub fn is_scalar(&self) -> bool {
-        self.numerator.is_scalar() && self.denominator.is_scalar()
-    }
-
     fn get_term_to_set_power_sign(expression: &Expression, is_positive: bool) -> Term {
         let mut variables_powers = HashMap::new();
         for term in expression.terms() {
-            for (variable, power) in term.variables() {
+            for (variable, power) in term.variables_map() {
                 if is_positive && *power < 0 {
                     variables_powers
                         .entry(*variable)
@@ -195,7 +75,7 @@ impl RationalExpression {
                     variables_powers
                         .entry(*variable)
                         .and_modify(|max_power: &mut TermVariablePowerType| {
-                            *max_power = (*max_power).min(*power)
+                            *max_power = (*max_power).max(*power)
                         })
                         .or_insert(*power);
                 }
@@ -217,7 +97,8 @@ impl RationalExpression {
         let numerator_norm = Self::get_term_to_set_power_sign(&numerator, true);
         let denominator_norm = Self::get_term_to_set_power_sign(&denominator, true);
 
-        let terms_lcm = Term::lcm(vec![numerator_norm, denominator_norm]);
+        let terms_lcm = Term::lcm(vec![numerator_norm, denominator_norm]).dissolve();
+        let terms_lcm = Term::from_btreemap(terms_lcm.0, 1_i64.into());
         Self {
             numerator: terms_lcm.clone() * numerator,
             denominator: terms_lcm * denominator,
@@ -232,24 +113,14 @@ impl RationalExpression {
         let numerator_norm = Self::get_term_to_set_power_sign(&numerator, false);
         let denominator_norm = Self::get_term_to_set_power_sign(&denominator, false);
 
-        let terms_lcm = Term::lcm(vec![numerator_norm, denominator_norm]);
+        let terms_lcm = Term::lcm(vec![numerator_norm.pow(-1), denominator_norm.pow(-1)])
+            .pow(-1)
+            .dissolve();
+        let terms_lcm = Term::from_btreemap(terms_lcm.0, 1_i64.into());
         Self {
             numerator: terms_lcm.clone() * numerator,
             denominator: terms_lcm * denominator,
         }
-    }
-
-    /// Returns the rational expression's SymPy-compatible string representation.
-    pub fn to_string_sympy(&self) -> String {
-        self.to_string_internal(true)
-    }
-
-    pub(super) fn to_string_internal(&self, is_sympy: bool) -> String {
-        format!(
-            "({})/({})",
-            self.numerator.to_string_internal(is_sympy),
-            self.denominator.to_string_internal(is_sympy)
-        )
     }
 
     /// Multiplies both the numerator and denominator of the rational expression by the given value.
@@ -267,6 +138,11 @@ impl RationalExpression {
 #[cfg(test)]
 mod tests {
     use num::traits::Inv;
+
+    use crate::{
+        forms::basic_traits::{Form, IsScalar},
+        operations::derivative::PartialDerivative,
+    };
 
     use super::*;
 
@@ -531,7 +407,7 @@ mod tests {
                 .clone()
                 .change_to_negative_power()
                 .to_string(),
-            "((2/7)w⁻²x⁻⁵y⁻³z⁻⁷ + (3/14)x⁻¹² + (5/3)y⁻³z⁻⁴)/((4/49)w⁻⁴x⁻⁵y⁻³z⁻¹⁴ + (6/49)w⁻²x⁻¹²z⁻⁷ + (20/21)w⁻²y⁻³z⁻¹¹ + (9/196)x⁻¹⁹y³ + (5/7)x⁻⁷z⁻⁴ + (25/9)x⁵y⁻³z⁻⁸)"
+            "((2/7)w⁻²x⁻¹⁰y⁻⁶z⁻⁷ + (3/14)x⁻¹⁷y⁻³ + (5/3)x⁻⁵y⁻⁶z⁻⁴)/((4/49)w⁻⁴x⁻¹⁰y⁻⁶z⁻¹⁴ + (6/49)w⁻²x⁻¹⁷y⁻³z⁻⁷ + (20/21)w⁻²x⁻⁵y⁻⁶z⁻¹¹ + (9/196)x⁻²⁴ + (5/7)x⁻¹²y⁻³z⁻⁴ + (25/9)y⁻⁶z⁻⁸)"
         );
     }
 

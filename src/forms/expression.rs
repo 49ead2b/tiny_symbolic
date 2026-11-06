@@ -1,11 +1,6 @@
-use crate::TermMultiplierType;
-use std::{collections::BTreeMap, fmt::Display};
+use std::collections::BTreeMap;
 
-use crate::{
-    TermVariablePowerType,
-    forms::{term::Term, variable::Variable},
-    operations::derivative::PartialDerivative,
-};
+use crate::*;
 
 /// A symbolic expression consisting of a sum of terms.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
@@ -14,17 +9,36 @@ pub struct Expression {
 }
 
 impl Expression {
+    pub(super) fn to_string_internal(&self, is_sympy: bool) -> String {
+        if self.is_zero() {
+            return "0".to_string();
+        }
+
+        let mut terms_iter = self.terms();
+        let first_term = terms_iter.next().unwrap();
+        let mut output = if first_term.multiplier() < 0.into() {
+            format!("-{}", (-first_term).to_string_internal(is_sympy))
+        } else {
+            first_term.to_string_internal(is_sympy)
+        };
+
+        for term in terms_iter {
+            if term.multiplier() < 0.into() {
+                output = format!("{} - {}", output, (-term).to_string_internal(is_sympy));
+            } else {
+                output = format!("{} + {}", output, term.to_string_internal(is_sympy));
+            }
+        }
+
+        output
+    }
+
     /// Extracts the terms of the expression into a vector of `Term` objects.
     pub fn dissolve_into_terms(self) -> Vec<Term> {
         self.terms
             .into_iter()
             .map(|(variables, multiplier)| Term::from_btreemap(variables, multiplier))
             .collect()
-    }
-
-    /// Is expression just 0
-    pub fn is_zero(&self) -> bool {
-        self.terms.is_empty() || self.terms().into_iter().all(|p| p.multiplier() == 0.into())
     }
 
     /// Raises this expression to a power
@@ -63,52 +77,8 @@ impl Expression {
         }
     }
 
-    /// Substitutes multiple variables with provided corresponding expressions.
-    pub fn substitute_multiple_variables_with_expressions<T, U>(self, substitutions: T) -> Self
-    where
-        T: IntoIterator<Item = (Variable, U)>,
-        U: Into<Expression>,
-    {
-        let to_be_substituted_expressions = substitutions
-            .into_iter()
-            .map(|(variable, expression)| (variable, Into::<Expression>::into(expression)))
-            .collect::<Vec<_>>();
-        let mut expression = Expression::default();
-        let terms = self.dissolve_into_terms();
-        for term in terms {
-            let term = term.substitute_multiple_variables_with_expressions(
-                to_be_substituted_expressions.clone(),
-            );
-            expression += term;
-        }
-
-        expression
-    }
-
-    /// Substitutes a variable raised to a power with a provided expression.
-    pub fn substitute_variable_power_with_expression(
-        self,
-        variable: Variable,
-        known_power: TermVariablePowerType,
-        subst: Expression,
-    ) -> Expression {
-        let mut expression = Expression::default();
-
-        let terms = self.dissolve_into_terms();
-        for term in terms {
-            let term = term.substitute_variable_power_with_expression(
-                variable,
-                known_power,
-                subst.clone(),
-            );
-            expression += term;
-        }
-
-        expression
-    }
-
     /// Get iterator of the terms composing the expression
-    pub fn terms(&self) -> impl IntoIterator<Item = Term> {
+    pub fn terms(&self) -> impl Iterator<Item = Term> {
         self.terms
             .iter()
             .map(|(variables, multiplier)| Term::from_btreemap(variables.clone(), *multiplier))
@@ -118,7 +88,7 @@ impl Expression {
     /// The term should identically match
     pub fn contains_term(&self, term: &Term) -> bool {
         self.terms
-            .get(term.variables())
+            .get(term.variables_map())
             .is_some_and(|multiplier| *multiplier == term.multiplier())
     }
 
@@ -139,116 +109,19 @@ impl Expression {
         self.terms.keys().any(|term| term.contains_key(variable))
     }
 
-    /// Returns true if the expression is a scalar (i.e., it has no variables).
-    pub fn is_scalar(&self) -> bool {
-        self.terms().into_iter().all(|p| p.is_scalar())
-    }
-
     /// Returns true if the expression is a term (i.e., it has at most one term).
     pub fn is_term(&self) -> bool {
         self.terms.len() <= 1
-    }
-
-    /// Returns the expression's SymPy-compatible string representation.
-    pub fn to_string_sympy(&self) -> String {
-        self.to_string_internal(true)
-    }
-
-    pub(super) fn to_string_internal(&self, is_sympy: bool) -> String {
-        if self.terms.is_empty() {
-            return "0".to_string();
-        }
-
-        let mut terms_iter = self.terms.iter();
-        let (first_variables, first_multiplier) = terms_iter.next().unwrap();
-        let mut output = if *first_multiplier < 0.into() {
-            format!(
-                "-{}",
-                Term::to_string_internal(first_variables, -(*first_multiplier), is_sympy)
-            )
-        } else {
-            Term::to_string_internal(first_variables, *first_multiplier, is_sympy)
-        };
-
-        for (variables, multiplier) in terms_iter {
-            if *multiplier < 0.into() {
-                output = format!(
-                    "{} - {}",
-                    output,
-                    Term::to_string_internal(variables, -(*multiplier), is_sympy)
-                );
-            } else {
-                output = format!(
-                    "{} + {}",
-                    output,
-                    Term::to_string_internal(variables, *multiplier, is_sympy)
-                );
-            }
-        }
-
-        output
-    }
-}
-
-impl Display for Expression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let output = self.to_string_internal(false);
-        write!(f, "{output}")
-    }
-}
-
-impl TryInto<Term> for Expression {
-    type Error = String;
-
-    fn try_into(self) -> Result<Term, Self::Error> {
-        let mut terms = self.dissolve_into_terms();
-        if terms.is_empty() {
-            Ok(0.into())
-        } else if terms.len() == 1 {
-            Ok(terms.pop().unwrap())
-        } else {
-            Err("Cannot be reduced to a term!".to_string())
-        }
-    }
-}
-
-impl<T> From<T> for Expression
-where
-    T: Into<Term>,
-{
-    fn from(value: T) -> Self {
-        let value = value.into();
-        let (variables, multiplier) = value.dissolve();
-        let mut expression = Self::default();
-        if multiplier != 0.into() {
-            expression.terms.insert(variables, multiplier);
-        }
-
-        expression
-    }
-}
-
-impl PartialDerivative for Expression {
-    fn calculate_derivate_wrt_variable(&self, variable: &Variable) -> Self {
-        let mut output = Expression::default();
-        let terms = self.clone().dissolve_into_terms();
-        for term in terms {
-            output += term.calculate_derivate_wrt_variable(variable);
-        }
-        output
-    }
-    fn calculate_nth_derivate_wrt_variable(&self, n: usize, variable: &Variable) -> Self {
-        let mut output = Expression::default();
-        let terms = self.clone().dissolve_into_terms();
-        for term in terms {
-            output += term.calculate_nth_derivate_wrt_variable(n, variable);
-        }
-        output
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        forms::basic_traits::{Form, IsScalar},
+        operations::derivative::PartialDerivative,
+    };
+
     use super::*;
     use fmtastic::Superscript;
 
@@ -429,8 +302,9 @@ mod tests {
         let y = Variable::new('y', None);
         let expression = x.pow(4) + y;
 
-        let substituted =
-            expression.substitute_variable_power_with_expression(x, 2, y.pow(2).into());
+        let substituted = substitution_operations::VariablePowerSubstitutions::<
+            Expression,
+        >::substitute_variable_power(expression, x, 2, y.pow(2).into());
 
         assert_eq!(substituted.to_string(), "y + y⁴");
     }
@@ -444,15 +318,19 @@ mod tests {
 
         let expression = x.pow(4) + y;
 
-        let substituted = expression
-            .clone()
-            .substitute_multiple_variables_with_expressions([(x, 2 + y.pow(2)), (y, 2 + z.pow(2))]);
+        let substituted = <Expression as substitution_operations::VariableSubstitutions<
+            Expression,
+        >>::substitute_variables(
+            expression.clone(), [(x, 2 + y.pow(2)), (y, 2 + z.pow(2))]
+        );
 
         assert_eq!(substituted.to_string(), "18 + 32y² + 24y⁴ + 8y⁶ + y⁸ + z²");
 
-        let _ = expression
-            .clone()
-            .substitute_multiple_variables_with_expressions([(x, 2 + y.pow(2)), (x, z.into())]);
+        let _ = <Expression as substitution_operations::VariableSubstitutions<
+            Expression,
+        >>::substitute_variables(
+            expression.clone(), [(x, 2 + y.pow(2)), (x, z.into())]
+        );
     }
 
     #[test]

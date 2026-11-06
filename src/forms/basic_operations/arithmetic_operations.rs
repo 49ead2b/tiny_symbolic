@@ -1,4 +1,5 @@
-mod assignment_operations {
+/// Assignment operations for symbolic terms and expressions.
+pub mod assignment_operations {
     use crate::*;
     use std::ops::{AddAssign, DivAssign, MulAssign, SubAssign};
 
@@ -101,10 +102,10 @@ mod assignment_operations {
 
     impl AddAssign<Term> for Expression {
         fn add_assign(&mut self, rhs: Term) {
-            if let Some(multiplier) = self.terms.get_mut(rhs.variables()) {
+            if let Some(multiplier) = self.terms.get_mut(rhs.variables_map()) {
                 *multiplier += rhs.multiplier();
                 if *multiplier == 0.into() {
-                    self.terms.remove(rhs.variables());
+                    self.terms.remove(rhs.variables_map());
                 }
             } else {
                 let (variables, multiplier) = rhs.dissolve();
@@ -140,10 +141,10 @@ mod assignment_operations {
 
     impl SubAssign<Term> for Expression {
         fn sub_assign(&mut self, rhs: Term) {
-            if let Some(multiplier) = self.terms.get_mut(rhs.variables()) {
+            if let Some(multiplier) = self.terms.get_mut(rhs.variables_map()) {
                 *multiplier -= rhs.multiplier();
                 if *multiplier == 0.into() {
-                    self.terms.remove(rhs.variables());
+                    self.terms.remove(rhs.variables_map());
                 }
             } else {
                 let (variables, multiplier) = rhs.dissolve();
@@ -270,24 +271,6 @@ mod assignment_operations {
         }
     }
 
-    impl AddAssign for Polynomial {
-        fn add_assign(&mut self, rhs: Self) {
-            *self = self.clone() + rhs;
-        }
-    }
-
-    impl SubAssign for Polynomial {
-        fn sub_assign(&mut self, rhs: Self) {
-            *self = self.clone() - rhs;
-        }
-    }
-
-    impl MulAssign for Polynomial {
-        fn mul_assign(&mut self, rhs: Self) {
-            *self = self.clone() * rhs;
-        }
-    }
-
     #[cfg(test)]
     mod assignment_operations_tests {
         use super::*;
@@ -300,7 +283,6 @@ mod assignment_operations {
             let term = Term::from(x) * scalar;
             let expression = Expression::from(term.clone()) + y;
             let rational = RationalExpression::from(expression.clone());
-            let polynomial = Polynomial::new(x, vec![1, 1]);
 
             let mut term_assign = term.clone();
             term_assign *= scalar;
@@ -349,16 +331,12 @@ mod assignment_operations {
             rational_assign /= x;
             rational_assign /= term;
             rational_assign /= expression;
-
-            let mut polynomial_assign = polynomial.clone();
-            polynomial_assign += polynomial.clone();
-            polynomial_assign -= polynomial.clone();
-            polynomial_assign *= polynomial;
         }
     }
 }
 
-mod binary_operations {
+/// Binary operations for symbolic terms and expressions.
+pub mod binary_operations {
     use crate::{impl_commutative_op, *};
     use std::ops::{Add, Div, Mul, Neg, Sub};
 
@@ -400,8 +378,6 @@ mod binary_operations {
     }
 
     impl_commutative_op!(Add::add, +, Variable, RationalExpression, RationalExpression);
-
-    impl_commutative_op!(Add::add, +, Variable, Polynomial, Polynomial);
 
     impl<T> Sub<T> for Variable
     where
@@ -446,14 +422,6 @@ mod binary_operations {
         }
     }
 
-    impl Sub<Polynomial> for Variable {
-        type Output = Polynomial;
-
-        fn sub(self, rhs: Polynomial) -> Self::Output {
-            -(rhs - self)
-        }
-    }
-
     impl<T> Mul<T> for Variable
     where
         T: Into<TermMultiplierType>,
@@ -478,8 +446,6 @@ mod binary_operations {
     impl_commutative_op!(Mul::mul, *, Variable, Expression, Expression);
 
     impl_commutative_op!(Mul::mul, *, Variable, RationalExpression, RationalExpression);
-
-    impl_commutative_op!(Mul::mul, *, Variable, Polynomial, Polynomial);
 
     impl<T> Div<T> for Variable
     where
@@ -564,8 +530,6 @@ mod binary_operations {
 
     impl_commutative_op!(Add::add, +, Term, RationalExpression, RationalExpression);
 
-    impl_commutative_op!(Add::add, +, Term, Polynomial, Polynomial);
-
     impl<T> Sub<T> for Term
     where
         T: Into<TermMultiplierType>,
@@ -609,14 +573,6 @@ mod binary_operations {
         }
     }
 
-    impl Sub<Polynomial> for Term {
-        type Output = Polynomial;
-
-        fn sub(self, rhs: Polynomial) -> Self::Output {
-            -(rhs - self)
-        }
-    }
-
     impl<T> Mul<T> for Term
     where
         T: Into<TermMultiplierType>,
@@ -650,8 +606,6 @@ mod binary_operations {
     impl_commutative_op!(Mul::mul, *, Term, Expression, Expression);
 
     impl_commutative_op!(Mul::mul, *, Term, RationalExpression, RationalExpression);
-
-    impl_commutative_op!(Mul::mul, *, Term, Polynomial, Polynomial);
 
     impl<T> Div<T> for Term
     where
@@ -749,8 +703,6 @@ mod binary_operations {
 
     impl_commutative_op!(Add::add, +, Expression, RationalExpression, RationalExpression);
 
-    impl_commutative_op!(Add::add, +, Expression, Polynomial, Polynomial);
-
     impl<T> Sub<T> for Expression
     where
         T: Into<TermMultiplierType>,
@@ -792,14 +744,6 @@ mod binary_operations {
         type Output = RationalExpression;
 
         fn sub(self, rhs: RationalExpression) -> Self::Output {
-            -(rhs - self)
-        }
-    }
-
-    impl Sub<Polynomial> for Expression {
-        type Output = Polynomial;
-
-        fn sub(self, rhs: Polynomial) -> Self::Output {
             -(rhs - self)
         }
     }
@@ -854,8 +798,6 @@ mod binary_operations {
     }
 
     impl_commutative_op!(Mul::mul, *, Expression, RationalExpression, RationalExpression);
-
-    impl_commutative_op!(Mul::mul, *, Expression, Polynomial, Polynomial);
 
     impl<T> Div<T> for Expression
     where
@@ -1007,166 +949,6 @@ mod binary_operations {
         }
     }
 
-    impl Neg for Polynomial {
-        type Output = Polynomial;
-
-        fn neg(mut self) -> Self::Output {
-            self.coefficients = self.coefficients.into_iter().map(|c| -c).collect();
-            self
-        }
-    }
-
-    impl Add<Polynomial> for Polynomial {
-        type Output = Polynomial;
-
-        fn add(self, rhs: Polynomial) -> Self::Output {
-            if self.variable != rhs.variable {
-                panic!("Cannot add polynomials with different variables!");
-            }
-
-            let max_order = usize::max(self.order, rhs.order);
-            let mut new_coefficients = vec![Expression::default(); max_order + 1];
-
-            for (i, coeff) in self.coefficients.into_iter().enumerate() {
-                new_coefficients[i] += coeff;
-            }
-
-            for (i, coeff) in rhs.coefficients.into_iter().enumerate() {
-                new_coefficients[i] += coeff;
-            }
-
-            while new_coefficients.last().is_some_and(|c| c.is_zero()) {
-                new_coefficients.pop();
-            }
-            Polynomial::new(self.variable, new_coefficients)
-        }
-    }
-
-    impl Sub<Polynomial> for Polynomial {
-        type Output = Polynomial;
-
-        fn sub(self, rhs: Polynomial) -> Self::Output {
-            if self.variable != rhs.variable {
-                panic!("Cannot subtract polynomials with different variables!");
-            }
-
-            let max_order = usize::max(self.order, rhs.order);
-            let mut new_coefficients = vec![Expression::default(); max_order + 1];
-
-            for (i, coeff) in self.coefficients.into_iter().enumerate() {
-                new_coefficients[i] += coeff;
-            }
-
-            for (i, coeff) in rhs.coefficients.into_iter().enumerate() {
-                new_coefficients[i] -= coeff;
-            }
-
-            while new_coefficients.last().is_some_and(|c| c.is_zero()) {
-                new_coefficients.pop();
-            }
-            Polynomial::new(self.variable, new_coefficients)
-        }
-    }
-
-    impl Mul<Polynomial> for Polynomial {
-        type Output = Polynomial;
-
-        fn mul(self, rhs: Polynomial) -> Self::Output {
-            if self.variable != rhs.variable {
-                panic!("Cannot multiply polynomials with different variables!");
-            }
-
-            let variable = self.variable;
-            let expression1 = Expression::from(self);
-            let expression2 = Expression::from(rhs);
-            let product_expression = expression1 * expression2;
-
-            Polynomial::from_expression(product_expression, variable)
-        }
-    }
-
-    impl Div<Polynomial> for Polynomial {
-        type Output = RationalExpression;
-
-        fn div(self, rhs: Polynomial) -> Self::Output {
-            if self.variable != rhs.variable {
-                panic!("Cannot divide polynomials with different variables!");
-            }
-
-            let expression1 = Expression::from(self);
-            let expression2 = Expression::from(rhs);
-
-            expression1 / expression2
-        }
-    }
-
-    macro_rules! impl_polynomial_expression_operation_for_multiplier {
-        ($trait:ident, $method:ident, $operator:tt) => {
-            impl<T> $trait<T> for Polynomial
-            where T: Into<TermMultiplierType> {
-                type Output = Polynomial;
-
-                fn $method(self, rhs: T) -> Self::Output {
-                    let variable = self.variable;
-                    let expression = Expression::from(self) $operator rhs.into();
-                    Polynomial::from_expression(expression, variable)
-                }
-            }
-        };
-    }
-
-    macro_rules! impl_polynomial_expression_operation {
-        ($trait:ident, $method:ident, $operator:tt, $rhs:ty) => {
-            impl $trait<$rhs> for Polynomial {
-                type Output = Polynomial;
-
-                fn $method(self, rhs: $rhs) -> Self::Output {
-                    let variable = self.variable;
-                    let expression = Expression::from(self) $operator rhs;
-                    Polynomial::from_expression(expression, variable)
-                }
-            }
-        };
-    }
-
-    macro_rules! impl_polynomial_division {
-        ($rhs:ty) => {
-            impl Div<$rhs> for Polynomial {
-                type Output = Polynomial;
-
-                fn div(self, rhs: $rhs) -> Self::Output {
-                    let variable = self.variable;
-                    let divisor = Term::from(rhs);
-                    if divisor.contains_variable(&variable) {
-                        panic!("Divisor cannot contain the polynomial variable. Convert the polynomial to a Expression first!");
-                    }
-                    let expression = Expression::from(self) / divisor;
-                    Polynomial::from_expression(expression, variable)
-                }
-            }
-        };
-    }
-
-    impl_polynomial_expression_operation_for_multiplier!(Add, add, +);
-    impl_polynomial_expression_operation!(Add, add, +, Variable);
-    impl_polynomial_expression_operation!(Add, add, +, Term);
-    impl_polynomial_expression_operation!(Add, add, +, Expression);
-
-    impl_polynomial_expression_operation_for_multiplier!(Sub, sub, -);
-    impl_polynomial_expression_operation!(Sub, sub, -, Variable);
-    impl_polynomial_expression_operation!(Sub, sub, -, Term);
-    impl_polynomial_expression_operation!(Sub, sub, -, Expression);
-
-    impl_polynomial_expression_operation_for_multiplier!(Mul, mul, *);
-    impl_polynomial_expression_operation!(Mul, mul, *, Variable);
-    impl_polynomial_expression_operation!(Mul, mul, *, Term);
-    impl_polynomial_expression_operation!(Mul, mul, *, Expression);
-
-    impl_polynomial_expression_operation_for_multiplier!(Div, div, /);
-    impl_polynomial_division!(Variable);
-    impl_polynomial_division!(Term);
-    // impl_polynomial_division!(Expression);
-
     macro_rules! implement_traits_on_numeric_types
     {
         ($t:ty) => {
@@ -1267,7 +1049,6 @@ mod binary_operations {
             let term = Term::from(y).pow(2) * Term::from(x) * scalar;
             let expression = Expression::from(term.clone()) + y;
             let rational = RationalExpression::new(expression.clone(), 1 + expression.clone());
-            let polynomial = Polynomial::new(x, vec![1, 1]);
 
             let _ = -x;
             let _ = x + scalar;
@@ -1357,28 +1138,6 @@ mod binary_operations {
             let _ = rational.clone() / expression.clone();
             let _ = rational.clone() / rational.clone();
 
-            let _ = -polynomial.clone();
-            let _ = polynomial.clone() + scalar;
-            let _ = polynomial.clone() + y;
-            let _ = polynomial.clone() + term.clone();
-            let _ = polynomial.clone() + expression.clone();
-            let _ = polynomial.clone() - scalar;
-            let _ = polynomial.clone() - y;
-            let _ = polynomial.clone() - term.clone();
-            let _ = polynomial.clone() - expression.clone();
-            let _ = polynomial.clone() * scalar;
-            let _ = polynomial.clone() * y;
-            let _ = polynomial.clone() * term.clone();
-            let _ = polynomial.clone() * expression.clone();
-            let _ = polynomial.clone() / scalar;
-            let _ = polynomial.clone() / y;
-            let _ = polynomial.clone() / Term::from(y);
-            // let _ = polynomial.clone() / (y + 1);
-            let _ = polynomial.clone() + polynomial.clone();
-            let _ = polynomial.clone() - polynomial.clone();
-            let _ = polynomial.clone() * polynomial.clone();
-            let _ = polynomial.clone() / polynomial.clone();
-
             let _ = -scalar;
             let _ = scalar + scalar;
             let _ = scalar + y;
@@ -1422,21 +1181,11 @@ mod binary_operations {
             let _ = 5 / expression.clone();
             let _ = 5 / rational.clone();
         }
-
-        #[test]
-        #[should_panic(
-            expected = "Divisor cannot contain the polynomial variable. Convert the polynomial to a Expression first!"
-        )]
-        fn test_polynomial_division_by_own_variable_panics() {
-            let x = Variable::new('x', None);
-            let polynomial = Polynomial::new(x, vec![1, 1]);
-
-            let _ = polynomial / x;
-        }
     }
 }
 
-mod cumulative_operations {
+/// Cumulative operations for symbolic terms and expressions.
+pub mod cumulative_operations {
     use crate::*;
     use std::{
         iter::{Product, Sum},
@@ -1538,106 +1287,6 @@ mod cumulative_operations {
         /// ```
         fn product<I: Iterator<Item = T>>(iter: I) -> Self {
             iter.map(|v| v.into()).fold(1.into(), Mul::mul)
-        }
-    }
-
-    impl Sum<Polynomial> for Polynomial {
-        /// Adds polynomials defined over the same variable.
-        ///
-        /// # Panics
-        ///
-        /// Panics if the iterator is empty or contains polynomials defined over
-        /// different variables.
-        ///
-        /// ```
-        /// use tiny_symbolic::*;
-        /// use std::iter::Sum;
-        ///
-        /// let x = Variable::new('x', None);
-        /// let polynomials = vec![
-        ///     Polynomial::new(x, vec![1, 1]),
-        ///     Polynomial::new(x, vec![2, 0, 1]),
-        /// ];
-        ///
-        /// assert_eq!(
-        ///     polynomials.into_iter().sum::<Polynomial>(),
-        ///     Polynomial::new(x, vec![3, 1, 1]),
-        /// );
-        /// ```
-        ///
-        /// ```should_panic
-        /// use tiny_symbolic::*;
-        /// use std::iter::Sum;
-        ///
-        /// let x = Variable::new('x', None);
-        /// let y = Variable::new('y', None);
-        /// let polynomials = vec![
-        ///     Polynomial::new(x, vec![1, 1]),
-        ///     Polynomial::new(y, vec![2, 1]),
-        /// ];
-        ///
-        /// let _: Polynomial = polynomials.into_iter().sum();
-        /// ```
-        fn sum<I: Iterator<Item = Polynomial>>(mut iter: I) -> Self {
-            let first = iter
-                .next()
-                .expect("Cannot sum an empty iterator of polynomials!");
-            iter.fold(first, |acc, polynomial| {
-                if acc.variable != polynomial.variable {
-                    panic!("Cannot sum polynomials with different variables!");
-                }
-                acc + polynomial
-            })
-        }
-    }
-
-    impl Product<Polynomial> for Polynomial {
-        /// Multiplies polynomials defined over the same variable.
-        ///
-        /// # Panics
-        ///
-        /// Panics if the iterator is empty or contains polynomials defined over
-        /// different variables.
-        ///
-        /// ```
-        /// use tiny_symbolic::*;
-        /// use std::iter::Product;
-        ///
-        /// let x = Variable::new('x', None);
-        /// let polynomials = vec![
-        ///     Polynomial::new(x, vec![1, 1]),
-        ///     Polynomial::new(x, vec![2, 0, 1]),
-        /// ];
-        ///
-        /// assert_eq!(
-        ///     polynomials.into_iter().product::<Polynomial>(),
-        ///     Polynomial::new(x, vec![2, 2, 1, 1]),
-        /// );
-        /// ```
-        ///
-        /// ```should_panic
-        /// use tiny_symbolic::*;
-        /// use std::iter::Product;
-        ///
-        /// let x = Variable::new('x', None);
-        /// let y = Variable::new('y', None);
-        /// let polynomials = vec![
-        ///     Polynomial::new(x, vec![1, 1]),
-        ///     Polynomial::new(y, vec![2, 1]),
-        /// ];
-        ///
-        /// let _: Polynomial = polynomials.into_iter().product();
-        /// ```
-        fn product<I: Iterator<Item = Polynomial>>(mut iter: I) -> Self {
-            let first = iter
-                .next()
-                .expect("Cannot multiply an empty iterator of polynomials!");
-            iter.fold(first, |acc, polynomial| {
-                if acc.variable != polynomial.variable {
-                    panic!("Cannot multiply polynomials with different variables!");
-                }
-                acc * polynomial
-            })
         }
     }
 }

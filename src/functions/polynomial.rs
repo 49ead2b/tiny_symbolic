@@ -1,28 +1,33 @@
 use std::fmt::Display;
 
-use crate::{algos::ElementarySymmetricPolynomials, operations::derivative::PartialDerivative, *};
+use crate::{algos::ElementarySymmetricPolynomials, *};
 
-type PolynomialCoefficientType = Expression;
+/// Types over which the polynomial coefficients can be defined
+pub trait PolynomialCoefficient: Default + IsStandardScalar + Form {}
+
+impl PolynomialCoefficient for Expression {}
+
+impl PolynomialCoefficient for RationalExpression {}
 
 /// A polynomial consisting of expression coefficients and a variable raised to a successive power.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Polynomial {
+pub struct Polynomial<T: PolynomialCoefficient> {
     pub(super) variable: Variable,
-    pub(super) coefficients: Vec<PolynomialCoefficientType>,
+    pub(super) coefficients: Vec<T>,
     pub(super) order: usize,
 }
 
-impl Polynomial {
+impl<T: PolynomialCoefficient> Polynomial<T> {
     /// Create a Polynomial from a variable and a vector of coefficients.
     /// The coefficients are in order of increasing power of the variable.
     /// Leading coefficient cannot be zero, and if the coefficients vector is empty,
     /// the polynomial is considered to be the zero polynomial.
-    pub fn new(
-        variable: Variable,
-        coefficients: Vec<impl Into<PolynomialCoefficientType>>,
-    ) -> Self {
-        let coefficients: Vec<PolynomialCoefficientType> =
-            coefficients.into_iter().map(|ex| ex.into()).collect();
+    pub fn new<I, C>(variable: Variable, coefficients: I) -> Self
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<T>,
+    {
+        let coefficients: Vec<T> = coefficients.into_iter().map(Into::into).collect();
         if coefficients.len() > 1 && coefficients.last().is_some_and(|ex| ex.is_zero()) {
             panic!("Leading coefficient cannot be zero!");
         }
@@ -30,7 +35,7 @@ impl Polynomial {
             Self {
                 variable,
                 order: 0,
-                coefficients: vec![0.into()],
+                coefficients: vec![T::default()],
             }
         } else {
             Self {
@@ -41,66 +46,9 @@ impl Polynomial {
         }
     }
 
-    /// Create a Polynomial from an expression and a variable. The expression is decomposed into terms to extract the coefficients for each power of the variable.
-    pub fn from_expression(expression: Expression, variable: Variable) -> Self {
-        if expression.is_zero() {
-            return Self::new(variable, vec![0]);
-        }
-
-        let terms = expression.dissolve_into_terms();
-        let highest_power = terms
-            .iter()
-            .map(|term| term.get_power_of_variable(&variable))
-            .max()
-            .unwrap();
-        let mut coefficients: Vec<Expression> =
-            vec![Expression::default(); highest_power as usize + 1];
-        for mut term in terms {
-            let variable_power = term.remove_variables(std::iter::once(&variable));
-            let power = variable_power.get_power_of_variable(&variable);
-
-            if let Some(handle) = coefficients.get_mut(power as usize) {
-                *handle += term;
-            }
-        }
-        Self::new(variable, coefficients)
-    }
-
     /// Returns the order (degree) of the polynomial.
     pub fn order(&self) -> usize {
         self.order
-    }
-
-    /// Computes the derivative wrt to the variable of the polynomial.
-    pub fn compute_nth_derivative(&self, n: usize) -> Self {
-        let output = Expression::from(self);
-        let output = output.calculate_nth_derivate_wrt_variable(n, &self.variable);
-
-        Self::from_expression(output, self.variable)
-    }
-
-    /// Constructs an ElementarySymmetricPolynomials object for the roots of the polynomial, using a specified variable to represent the roots.
-    /// For Example, if 'root_variable is 'x', then roots will be represented as x₁, x₂, ... xₙ when n is the order of the polynomial.
-    pub fn construct_esc_for_roots(&self, root_variable: char) -> ElementarySymmetricPolynomials {
-        let leading_coeff = self.coefficients.last().unwrap().clone();
-        let leading_coeff: Term = match TryInto::<Term>::try_into(leading_coeff) {
-            Ok(term) => term,
-            Err(_) => panic!("Leading coefficient is a expression!"),
-        };
-        let esc_variables = (1..=self.order())
-            .map(|k| Variable::new(root_variable, Some(k as i64)))
-            .collect::<Vec<Variable>>();
-        let mut esc_calculator = ElementarySymmetricPolynomials::from_variables(&esc_variables);
-        for combination_length in 1..=self.order() {
-            let minus_one_to_power = if combination_length % 2 == 0 { 1 } else { -1 };
-            let numerator = self.coefficients[self.order - combination_length].clone();
-            let denominator = leading_coeff.clone();
-            esc_calculator.set_ek_substitution_as(
-                combination_length,
-                minus_one_to_power * numerator / denominator,
-            );
-        }
-        esc_calculator
     }
 
     fn to_string_internal(&self, is_sympy: bool) -> String {
@@ -153,18 +101,74 @@ impl Polynomial {
         self.to_string_internal(true)
     }
 
-    /// Evaluates polynomial for the input expression
-    pub fn eval_at_expression<T: Into<Expression>>(&self, expression: T) -> Expression {
-        let poly_expression = Expression::from(self);
-        poly_expression.substitute_multiple_variables_with_expressions(std::iter::once((
-            self.variable,
-            expression,
-        )))
+    /// Get coefficients and variables
+    pub fn dissolve(self) -> (Vec<T>, Variable) {
+        (self.coefficients, self.variable)
+    }
+}
+
+impl Polynomial<Expression> {
+    /// Constructs an ElementarySymmetricPolynomials object for the roots of the polynomial, using a specified variable to represent the roots.
+    /// For Example, if 'root_variable is 'x', then roots will be represented as x₁, x₂, ... xₙ when n is the order of the polynomial.
+    pub fn construct_esc_for_roots(
+        &self,
+        root_variable: char,
+    ) -> ElementarySymmetricPolynomials<Expression> {
+        let leading_coeff = self.coefficients.last().cloned().unwrap();
+        let leading_coeff: Term = match TryInto::<Term>::try_into(leading_coeff) {
+            Ok(term) => term,
+            Err(_) => panic!("Leading coefficient is a expression!"),
+        };
+        let esc_variables = (1..=self.order())
+            .map(|k| Variable::new(root_variable, Some(k as i64)))
+            .collect::<Vec<Variable>>();
+        let mut esc_calculator = ElementarySymmetricPolynomials::from_variables(&esc_variables);
+        for combination_length in 1..=self.order() {
+            let minus_one_to_power = if combination_length % 2 == 0 { 1 } else { -1 };
+            let numerator = self.coefficients[self.order - combination_length].clone();
+            let denominator = leading_coeff.clone();
+            esc_calculator.set_ek_substitution_as(
+                combination_length,
+                minus_one_to_power * numerator / denominator,
+            );
+        }
+        esc_calculator
+    }
+
+    /// Create a Polynomial from an expression and a variable. The expression is decomposed into terms to extract the coefficients for each power of the variable.
+    pub fn from_expression(expression: Expression, variable: Variable) -> Self {
+        if expression.is_zero() {
+            return Self::new(variable, vec![Expression::default()]);
+        }
+
+        let terms = expression.dissolve_into_terms();
+        let highest_power = terms
+            .iter()
+            .map(|term| {
+                let power = term.get_power_of_variable(&variable);
+                if power < 0 {
+                    panic!("Polynomial cannot have negative powers of the variable!");
+                }
+                power
+            })
+            .max()
+            .unwrap();
+        let mut coefficients: Vec<Expression> =
+            vec![Expression::default(); highest_power as usize + 1];
+        for mut term in terms {
+            let variable_power = term.remove_variables(std::iter::once(&variable));
+            let power = variable_power.get_power_of_variable(&variable);
+
+            if let Some(handle) = coefficients.get_mut(power as usize) {
+                *handle += term;
+            }
+        }
+        Polynomial::new(variable, coefficients)
     }
 
     /// Raise Polynomial to a positive power
     /// For negative powers, convert to an expression first
-    pub fn pow(self, n: u64) -> Polynomial {
+    pub fn pow(self, n: u64) -> Self {
         let variable = self.variable;
         Polynomial::from_expression(
             Expression::from(self).pow(n as TermVariablePowerType),
@@ -172,20 +176,38 @@ impl Polynomial {
         )
     }
 
-    /// Get coefficients and variables
-    pub fn dissolve(self) -> (Vec<PolynomialCoefficientType>, Variable) {
-        (self.coefficients, self.variable)
+    /// Evaluates polynomial for the input expression
+    pub fn eval_at_expression<T: Into<Expression>>(&self, expression: T) -> Expression {
+        let poly_expression = Expression::from(self);
+        <Expression as substitution_operations::VariableSubstitutions<
+            Expression,
+        >>::substitute_variables(
+            poly_expression,
+            std::iter::once((self.variable, expression)),
+        )
+    }
+
+    /// Computes the derivative wrt to the variable of the polynomial.
+    pub fn compute_nth_derivative(&self, n: usize) -> Self {
+        let output = Expression::from(self);
+        let output = operations::derivative::PartialDerivative::calculate_nth_derivate_wrt_variable(
+            &output,
+            n,
+            &self.variable,
+        );
+
+        Self::from_expression(output, self.variable)
     }
 }
 
-impl Display for Polynomial {
+impl<T: PolynomialCoefficient> Display for Polynomial<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_string_internal(false))
     }
 }
 
-impl From<&Polynomial> for Expression {
-    fn from(polynomial: &Polynomial) -> Self {
+impl From<&Polynomial<Expression>> for Expression {
+    fn from(polynomial: &Polynomial<Expression>) -> Self {
         polynomial
             .coefficients
             .iter()
@@ -197,35 +219,16 @@ impl From<&Polynomial> for Expression {
     }
 }
 
-impl From<Polynomial> for Expression {
-    fn from(polynomial: Polynomial) -> Self {
+impl From<Polynomial<Expression>> for Expression {
+    fn from(polynomial: Polynomial<Expression>) -> Self {
         Expression::from(&polynomial)
-    }
-}
-
-impl PartialDerivative for Polynomial {
-    fn calculate_derivate_wrt_variable(&self, variable: &Variable) -> Self {
-        let expression = Expression::from(self);
-        let derivative_expression = expression.calculate_derivate_wrt_variable(variable);
-
-        Polynomial::from_expression(derivative_expression, self.variable)
-    }
-
-    fn calculate_nth_derivate_wrt_variable(&self, n: usize, variable: &Variable) -> Self
-    where
-        Self: Sized,
-    {
-        let expression = Expression::from(self);
-        let derivative_expression = expression.calculate_nth_derivate_wrt_variable(n, variable);
-
-        Polynomial::from_expression(derivative_expression, self.variable)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::Polynomial;
-    use crate::{operations::derivative::PartialDerivative, *};
+    use crate::*;
 
     #[test]
     fn basic_test() {
@@ -233,16 +236,16 @@ mod tests {
         let a = Variable::new('a', None);
         let b = Variable::new('b', None);
         let c = Variable::new('c', None);
-        let quadratic = Polynomial::new(variable, vec![c, b, a]);
+        let quadratic = Polynomial::<Expression>::new(variable, vec![c, b, a]);
 
         assert_eq!(quadratic.to_string(), "(c) + (b)x + (a)x²");
 
         let variable = Variable::new('x', None);
-        let quadratic = Polynomial::new(variable, Vec::<crate::Expression>::new());
+        let quadratic = Polynomial::<Expression>::new(variable, Vec::<crate::Expression>::new());
 
         assert_eq!(quadratic.to_string(), "0");
 
-        let quadratic = Polynomial::new(
+        let quadratic = Polynomial::<Expression>::new(
             variable,
             vec![
                 Expression::default() + c,
@@ -304,62 +307,12 @@ mod tests {
     }
 
     #[test]
-    fn partial_derivative_wrt_variable_test() {
-        let x = Variable::new('x', None);
-        let a = Variable::new('a', None);
-        let b = Variable::new('b', None);
-        let c = Variable::new('c', None);
-        let polynomial = Polynomial::new(x, vec![c, b, a]);
-
-        assert_eq!(
-            polynomial.calculate_derivate_wrt_variable(&x),
-            Polynomial::new(x, vec![Expression::from(b), (2 * a).into()])
-        );
-        assert_eq!(
-            polynomial.calculate_derivate_wrt_variable(&a),
-            Polynomial::new(x, vec![0, 0, 1])
-        );
-        assert_eq!(
-            polynomial.calculate_derivate_wrt_variable(&Variable::new('y', None)),
-            Polynomial::new(x, vec![0])
-        );
-    }
-
-    #[test]
-    fn nth_partial_derivative_wrt_variable_test() {
-        let x = Variable::new('x', None);
-        let a = Variable::new('a', None);
-        let b = Variable::new('b', None);
-        let polynomial = Polynomial::new(
-            x,
-            vec![
-                Expression::from(1),
-                Expression::from(b),
-                Expression::from(a),
-            ],
-        );
-
-        assert_eq!(
-            polynomial.calculate_nth_derivate_wrt_variable(2, &x),
-            Polynomial::new(x, vec![2 * a])
-        );
-        assert_eq!(
-            polynomial.calculate_nth_derivate_wrt_variable(2, &a),
-            Polynomial::new(x, vec![0])
-        );
-        assert_eq!(
-            polynomial.calculate_nth_derivate_wrt_variable(0, &x),
-            polynomial
-        );
-    }
-
-    #[test]
     fn to_string_test() {
         let variable = Variable::new('x', None);
         let a = Variable::new('a', None);
         let b = Variable::new('b', None);
         let c = Variable::new('c', None);
-        let quadratic = Polynomial::new(variable, vec![c + b, b + a, a + c]);
+        let quadratic = Polynomial::<Expression>::new(variable, vec![c + b, b + a, a + c]);
 
         assert_eq!(quadratic.to_string(), "(b + c) + (a + b)x + (a + c)x²");
         assert_eq!(

@@ -86,7 +86,8 @@ This is especially useful when manipulating fractions, common denominators, and 
 A polynomial is represented as a coefficient vector for a single variable. This makes polynomial arithmetic and differentiation straightforward:
 
 ```rust
-use tiny_symbolic::{Polynomial, Variable};
+use tiny_symbolic::functions::polynomial::Polynomial;
+use tiny_symbolic::Variable;
 
 fn main() {
     let x = Variable::new('x', None);
@@ -104,13 +105,19 @@ Polynomials can also be created from an existing expression by extracting the co
 Substitution is one of the most useful operations when working with symbolic formulas:
 
 ```rust
-use tiny_symbolic::Variable;
+use tiny_symbolic::{Expression, Variable};
+use tiny_symbolic::substitution_operations::{
+    VariablePowerSubstitutions, VariableSubstitutions,
+};
 
 fn main() {
     let x = Variable::new('x', None);
     let expr = x.pow(3) + 2 * x.pow(2) - x + 7;
 
-    let substituted = expr.substitute_multiple_variables_with_expressions([(x, 3)]);
+    let substituted = <Expression as VariableSubstitutions<Expression>>::substitute_variables(
+        expr,
+        [(x, 3)],
+    );
     println!("{}", substituted); // Will output 49
 
     let a = Variable::new('A', None);
@@ -119,9 +126,14 @@ fn main() {
     let w = Variable::new('W', None); // Suppose W is the cube root of unity
 
     let expr = (a + b + c) * (a + w * b + w.pow(2) * c) * (a + w.pow(2) * b + w * c);
-    let substituted = expr
-        .substitute_variable_power_with_expression(w, 3, 1_i64.into())
-        .substitute_variable_power_with_expression(w, 2, -1 - w);
+    let substituted =
+        <Expression as VariablePowerSubstitutions<Expression>>::substitute_variable_power(
+            expr, w, 3, 1.into(),
+        );
+    let substituted =
+        <Expression as VariablePowerSubstitutions<Expression>>::substitute_variable_power(
+            substituted, w, 2, -1 - w,
+        );
 
     println!("{substituted}"); // Will output -3ABC + A³ + B³ + C³
 }
@@ -135,7 +147,7 @@ For SymPy workflows, the formatting helpers can render expressions in a SymPy-co
 
 ```rust
 use num::Rational64;
-use tiny_symbolic::Variable;
+use tiny_symbolic::{Form, Variable};
 
 fn main() {
     let x = Variable::new('x', None);
@@ -154,7 +166,7 @@ This prints a SymPy-friendly form `(4/3)*x*(y**3) + z`.
 The `ElementarySymmetricPolynomials` helper lets you reason about symmetric expressions in terms of elementary symmetric functions.
 
 ```rust
-use tiny_symbolic::Variable;
+use tiny_symbolic::{Expression, Variable};
 use tiny_symbolic::algos::ElementarySymmetricPolynomials;
 
 fn main() {
@@ -164,7 +176,7 @@ fn main() {
 
     let expr = a.pow(2) + b.pow(2) + c.pow(2) + a.pow(2) * b + a.pow(2) * c + b.pow(2) * a + b.pow(2) * c + c.pow(2) * a + c.pow(2) * b;
 
-    let mut esp = ElementarySymmetricPolynomials::from_variables(&vec![a, b, c]);
+    let mut esp = ElementarySymmetricPolynomials::<Expression>::from_variables(&vec![a, b, c]);
     esp.set_ek_substitution_as(1, Variable::new('p', Some(1)).into());
     esp.set_ek_substitution_as(2, Variable::new('p', Some(2)).into());
     esp.set_ek_substitution_as(3, Variable::new('p', Some(3)).into());
@@ -185,7 +197,7 @@ This is the intended pattern for turning a symmetric polynomial into a more conv
 - `tiny_symbolic::Term`
 - `tiny_symbolic::Expression`
 - `tiny_symbolic::RationalExpression`
-- `tiny_symbolic::Polynomial`
+- `tiny_symbolic::functions::polynomial::Polynomial`
 - `tiny_symbolic::algos::ElementarySymmetricPolynomials`
 
 ## License

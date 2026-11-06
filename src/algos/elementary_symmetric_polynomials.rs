@@ -5,10 +5,7 @@ use std::{
 
 use itertools::Itertools;
 
-use crate::{
-    TermVariablePowerType,
-    forms::{expression::Expression, term::Term, variable::Variable},
-};
+use crate::{functions::polynomial::PolynomialCoefficient, *};
 
 /// A small symbolic engine for rewriting symmetric expressions using elementary symmetric
 /// polynomials.
@@ -17,19 +14,23 @@ use crate::{
 /// 1. Group terms by their exponent pattern.
 /// 2. Check that the grouped structure is compatible with symmetry.
 /// 3. Rewrite each pattern recursively using Newton-Girard identities.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct ElementarySymmetricPolynomials {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ElementarySymmetricPolynomials<T: PolynomialCoefficient = Expression> {
+    /// The basic combinations of variables which form the fundamental symmetric combinations
     elementary_polynomial_representations: HashMap<usize, Expression>,
-    elementary_polynomial_substitutions: HashMap<usize, Expression>,
+    /// Custom substitutions which can be provided by the user to use instead of the placehoder eₖ
+    elementary_polynomial_substitutions: HashMap<usize, T>,
+    /// The variables used in the ESP
     variables: HashSet<Variable>,
+    /// Internally used cache to avoid repeating calculations
     cache_power_sums: HashMap<Vec<TermVariablePowerType>, Expression>,
 }
 
-impl ElementarySymmetricPolynomials {
+impl<T: PolynomialCoefficient> ElementarySymmetricPolynomials<T> {
     /// Build an elementary symmetric polynomial tracker from a collection of variables.
-    pub fn from_variables<T>(variables: &T) -> Self
+    pub fn from_variables<U>(variables: &U) -> Self
     where
-        for<'a> &'a T: IntoIterator<Item = &'a Variable>,
+        for<'a> &'a U: IntoIterator<Item = &'a Variable>,
     {
         let combinations = Self::generate_all_combinations(variables);
 
@@ -60,9 +61,9 @@ impl ElementarySymmetricPolynomials {
     }
 
     /// Build the original elementary symmetric polynomial representations for each degree.
-    fn generate_all_combinations<T>(variables: &T) -> impl IntoIterator<Item = (usize, Expression)>
+    fn generate_all_combinations<U>(variables: &U) -> impl IntoIterator<Item = (usize, Expression)>
     where
-        for<'a> &'a T: IntoIterator<Item = &'a Variable>,
+        for<'a> &'a U: IntoIterator<Item = &'a Variable>,
     {
         let variables_vec = variables.into_iter().copied().collect::<Vec<_>>();
         (0..variables_vec.len()).map(move |k| {
@@ -89,7 +90,7 @@ impl ElementarySymmetricPolynomials {
 
     /// Set a substitution for the sum of all distinct products of k distinct variables
     /// This will be used while simplifying a ESP using simplify() method
-    pub fn set_ek_substitution_as(&mut self, k: usize, new_expression: Expression) {
+    pub fn set_ek_substitution_as(&mut self, k: usize, new_expression: T) {
         if k < 1 || k > self.variables.len() {
             panic!("k is outside range for ESP!");
         }
@@ -106,7 +107,7 @@ impl ElementarySymmetricPolynomials {
 
     /// Get the substitution for the sum of all distinct products of k distinct variables
     /// Set using set_ek_substitution_as() method
-    pub fn get_ek_substitution(&self, k: usize) -> &Expression {
+    pub fn get_ek_substitution(&self, k: usize) -> &T {
         self.elementary_polynomial_substitutions
             .get(&k)
             .expect("k is outside range for this ESP or substitution not set!")
@@ -170,9 +171,8 @@ impl ElementarySymmetricPolynomials {
     /// Extract the exponent pattern of a term, keeping only the variables in this system.
     fn power_pattern_for_term(&self, term: &Term) -> Vec<TermVariablePowerType> {
         term.variables()
-            .iter()
-            .filter(|(variable, _)| self.variables.contains(*variable))
-            .map(|(variable, _)| term.get_power_of_variable(variable))
+            .filter(|variable| self.variables.contains(variable))
+            .map(|variable| term.get_power_of_variable(&variable))
             .sorted()
             .rev()
             .collect()
@@ -317,7 +317,6 @@ impl ElementarySymmetricPolynomials {
     fn get_min_power_in_expression(&self, input: &Expression) -> TermVariablePowerType {
         input
             .terms()
-            .into_iter()
             .map(|term| {
                 self.variables
                     .iter()
@@ -328,7 +327,9 @@ impl ElementarySymmetricPolynomials {
             .min()
             .unwrap_or_default()
     }
+}
 
+impl ElementarySymmetricPolynomials<Expression> {
     /// Simplify a symmetric expression by rewriting it in terms of elementary symmetric polynomials.
     pub fn simplify_symmetric_expression(&mut self, mut input: Expression) -> Expression {
         let min_power = self.get_min_power_in_expression(&input);
@@ -351,7 +352,7 @@ impl ElementarySymmetricPolynomials {
             output += multiplier * pattern_expression / symmetry_factor;
         }
 
-        let mut substitutions = HashSet::new();
+        let mut substitutions: HashSet<(Variable, Expression)> = HashSet::new();
         for k in 1..=self.variables.len() {
             let variable = Variable::new('e', Some(k as i64));
             if let Some(substitution) = self.elementary_polynomial_substitutions.get(&(k)) {
@@ -359,7 +360,47 @@ impl ElementarySymmetricPolynomials {
             }
         }
 
-        output.substitute_multiple_variables_with_expressions(substitutions)
+        <Expression as substitution_operations::VariableSubstitutions<
+            Expression,
+        >>::substitute_variables(output, substitutions)
+    }
+}
+
+impl ElementarySymmetricPolynomials<RationalExpression> {
+    /// Simplify a symmetric expression by rewriting it in terms of elementary symmetric polynomials.
+    pub fn simplify_symmetric_expression(&mut self, mut input: Expression) -> RationalExpression {
+        let min_power = self.get_min_power_in_expression(&input);
+        if min_power < 0 {
+            let denominator =
+                self.ek_as_variable_expression(self.variable_count() as TermVariablePowerType);
+            let numerator = self
+                .variables()
+                .map(|variable| variable.pow(-min_power))
+                .fold(Term::default(), Mul::mul);
+            input *= numerator * denominator.pow(min_power);
+        }
+        let partitions = self.partition_into_symmetric_expression(&input);
+        let mut output = Expression::default();
+
+        for (pattern, multiplier) in partitions {
+            let symmetry_factor =
+                self.symmetry_factor_for_pattern(&pattern) as TermVariablePowerType;
+            let pattern_expression = self.expression_for_power_pattern(&pattern);
+            output += multiplier * pattern_expression / symmetry_factor;
+        }
+
+        let mut substitutions: Vec<(Variable, RationalExpression)> = Vec::new();
+        for k in 1..=self.variables.len() {
+            let variable = Variable::new('e', Some(k as i64));
+            if let Some(substitution) = self.elementary_polynomial_substitutions.get(&(k)) {
+                substitutions.push((variable, substitution.clone()));
+            }
+        }
+
+        substitution_operations::VariableSubstitutions::<RationalExpression>::substitute_variables(
+            output,
+            substitutions,
+        )
     }
 }
 
@@ -382,7 +423,8 @@ mod tests {
             - mvar * beta
             + mvar.pow(2) * gamma;
 
-        let mut esp = ElementarySymmetricPolynomials::from_variables(&vec![alpha, beta, gamma]);
+        let mut esp =
+            ElementarySymmetricPolynomials::<Expression>::from_variables(&vec![alpha, beta, gamma]);
         esp.set_ek_substitution_as(1, Variable::new('p', Some(1)).into());
         esp.set_ek_substitution_as(2, Variable::new('p', Some(2)).into());
         esp.set_ek_substitution_as(3, Variable::new('p', Some(3)).into());
@@ -397,7 +439,8 @@ mod tests {
         );
         let f_z = 4 * (alpha + beta + gamma).pow(2) + 8 * (alpha + beta + gamma).pow(12);
 
-        let mut esp = ElementarySymmetricPolynomials::from_variables(&vec![alpha, beta, gamma]);
+        let mut esp =
+            ElementarySymmetricPolynomials::<Expression>::from_variables(&vec![alpha, beta, gamma]);
         esp.set_ek_substitution_as(1, Variable::new('p', Some(1)).into());
         esp.set_ek_substitution_as(2, Variable::new('p', Some(2)).into());
         esp.set_ek_substitution_as(3, Variable::new('p', Some(3)).into());
@@ -413,7 +456,8 @@ mod tests {
         );
         let f_z = 4 * mvar * (alpha + beta + gamma).pow(2);
 
-        let mut esp = ElementarySymmetricPolynomials::from_variables(&vec![alpha, beta, gamma]);
+        let mut esp =
+            ElementarySymmetricPolynomials::<Expression>::from_variables(&vec![alpha, beta, gamma]);
         esp.set_ek_substitution_as(1, Variable::new('p', Some(1)).into());
         esp.set_ek_substitution_as(2, Variable::new('p', Some(2)).into());
         esp.set_ek_substitution_as(3, Variable::new('p', Some(3)).into());
@@ -433,7 +477,8 @@ mod tests {
         let f_z = 4 * mvar * (alpha + beta + gamma).pow(2) * mvar * (alpha * beta * gamma).pow(2)
             + (alpha * beta + beta * gamma + gamma * alpha).pow(4);
 
-        let mut esp = ElementarySymmetricPolynomials::from_variables(&vec![alpha, beta, gamma]);
+        let mut esp =
+            ElementarySymmetricPolynomials::<Expression>::from_variables(&vec![alpha, beta, gamma]);
 
         let p1 = Variable::new('p', Some(1));
         let p2 = Variable::new('p', Some(2));
@@ -480,7 +525,8 @@ mod tests {
         let p3 = Variable::new('p', Some(3));
         let p4 = Variable::new('p', Some(4));
 
-        let mut esp = ElementarySymmetricPolynomials::from_variables(&vec![a, b, c, d]);
+        let mut esp =
+            ElementarySymmetricPolynomials::<Expression>::from_variables(&vec![a, b, c, d]);
         esp.set_ek_substitution_as(1, p1.into());
         esp.set_ek_substitution_as(2, p2.into());
         esp.set_ek_substitution_as(3, p3.into());
@@ -519,7 +565,8 @@ mod tests {
 
         let f_z = TermMultiplierType::new(4, 3) * e1.pow(3) * e2.pow(2) * e3.pow(3) * e4.pow(4) + m;
 
-        let mut esp = ElementarySymmetricPolynomials::from_variables(&vec![a, b, c, d]);
+        let mut esp =
+            ElementarySymmetricPolynomials::<Expression>::from_variables(&vec![a, b, c, d]);
         esp.set_ek_substitution_as(1, Variable::new('p', Some(1)).into());
         esp.set_ek_substitution_as(2, Variable::new('p', Some(2)).into());
         esp.set_ek_substitution_as(3, Variable::new('p', Some(3)).into());
@@ -543,7 +590,7 @@ mod tests {
             Variable::new('B', None),
             Variable::new('C', None),
         );
-        let esp = ElementarySymmetricPolynomials::from_variables(&vec![a, b, c]);
+        let esp = ElementarySymmetricPolynomials::<Expression>::from_variables(&vec![a, b, c]);
 
         assert_eq!(esp.variable_count(), 3);
         assert!(esp.is_variable_present(&a));
@@ -562,7 +609,7 @@ mod tests {
             Variable::new('B', None),
             Variable::new('C', None),
         );
-        let mut esp = ElementarySymmetricPolynomials::from_variables(&vec![a, b, c]);
+        let mut esp = ElementarySymmetricPolynomials::<Expression>::from_variables(&vec![a, b, c]);
 
         let sk_0 = esp.get_sk_using_newton_girard_formula(0);
         let sk_1 = esp.get_sk_using_newton_girard_formula(1);
@@ -587,7 +634,7 @@ mod tests {
             Variable::new('B', None),
             Variable::new('C', None),
         );
-        let mut esp = ElementarySymmetricPolynomials::from_variables(&vec![a, b, c]);
+        let mut esp = ElementarySymmetricPolynomials::<Expression>::from_variables(&vec![a, b, c]);
 
         let actual = esp.expression_for_power_pattern(&[1, 1, 1]);
         let expected = Expression::from(6) * Variable::new('e', Some(3));
@@ -602,7 +649,7 @@ mod tests {
             Variable::new('B', None),
             Variable::new('C', None),
         );
-        let esp = ElementarySymmetricPolynomials::from_variables(&vec![a, b, c]);
+        let esp = ElementarySymmetricPolynomials::<Expression>::from_variables(&vec![a, b, c]);
 
         let actual = esp.ek_as_variable_expression(0);
 
@@ -616,7 +663,7 @@ mod tests {
             Variable::new('B', None),
             Variable::new('C', None),
         );
-        let mut esp = ElementarySymmetricPolynomials::from_variables(&vec![a, b, c]);
+        let mut esp = ElementarySymmetricPolynomials::<Expression>::from_variables(&vec![a, b, c]);
         let substitution: Expression = Variable::new('p', Some(2)).into();
 
         esp.set_ek_substitution_as(2, substitution.clone());
@@ -636,7 +683,7 @@ mod tests {
             Variable::new('B', None),
             Variable::new('C', None),
         );
-        let mut esp = ElementarySymmetricPolynomials::from_variables(&vec![a, b, c]);
+        let mut esp = ElementarySymmetricPolynomials::<Expression>::from_variables(&vec![a, b, c]);
         let substitution: Expression = Variable::new('p', Some(2)).into();
 
         esp.set_ek_substitution_as(4, substitution.clone());
@@ -652,7 +699,8 @@ mod tests {
         );
         let f_z = 4 * (alpha - beta + gamma);
 
-        let mut esp = ElementarySymmetricPolynomials::from_variables(&vec![alpha, beta, gamma]);
+        let mut esp =
+            ElementarySymmetricPolynomials::<Expression>::from_variables(&vec![alpha, beta, gamma]);
 
         let _ = esp.simplify_symmetric_expression(f_z);
     }
