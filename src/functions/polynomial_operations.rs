@@ -371,6 +371,7 @@ pub mod cumulative_operations {
         ///
         /// ```
         /// use tiny_symbolic::*;
+        /// use tiny_symbolic::functions::polynomial::Polynomial;
         /// use std::iter::Sum;
         ///
         /// let x = Variable::new('x', None);
@@ -387,6 +388,7 @@ pub mod cumulative_operations {
         ///
         /// ```should_panic
         /// use tiny_symbolic::*;
+        /// use tiny_symbolic::functions::polynomial::Polynomial;
         /// use std::iter::Sum;
         ///
         /// let x = Variable::new('x', None);
@@ -424,6 +426,7 @@ pub mod cumulative_operations {
         ///
         /// ```
         /// use tiny_symbolic::*;
+        /// use tiny_symbolic::functions::polynomial::Polynomial;
         /// use std::iter::Product;
         ///
         /// let x = Variable::new('x', None);
@@ -440,6 +443,7 @@ pub mod cumulative_operations {
         ///
         /// ```should_panic
         /// use tiny_symbolic::*;
+        /// use tiny_symbolic::functions::polynomial::Polynomial;
         /// use std::iter::Product;
         ///
         /// let x = Variable::new('x', None);

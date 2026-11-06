@@ -1,7 +1,7 @@
 use crate::*;
 
 /// Trait for calculating the partial derivative of an expression with respect to a variable.
-pub trait PartialDerivative {
+pub trait PartialDerivative: Form {
     /// Calculates the partial derivative of the implementing type with respect to the specified variable.
     fn calculate_derivate_wrt_variable(&self, variable: &Variable) -> Self;
 
@@ -10,6 +10,10 @@ pub trait PartialDerivative {
     where
         Self: Sized,
     {
+        if n == 0 {
+            return self.clone();
+        }
+
         let mut result = self.calculate_derivate_wrt_variable(variable);
         n -= 1;
 

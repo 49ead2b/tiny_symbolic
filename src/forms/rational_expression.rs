@@ -75,7 +75,7 @@ impl RationalExpression {
                     variables_powers
                         .entry(*variable)
                         .and_modify(|max_power: &mut TermVariablePowerType| {
-                            *max_power = (*max_power).min(*power)
+                            *max_power = (*max_power).max(*power)
                         })
                         .or_insert(*power);
                 }
@@ -97,7 +97,8 @@ impl RationalExpression {
         let numerator_norm = Self::get_term_to_set_power_sign(&numerator, true);
         let denominator_norm = Self::get_term_to_set_power_sign(&denominator, true);
 
-        let terms_lcm = Term::lcm(vec![numerator_norm, denominator_norm]);
+        let terms_lcm = Term::lcm(vec![numerator_norm, denominator_norm]).dissolve();
+        let terms_lcm = Term::from_btreemap(terms_lcm.0, 1_i64.into());
         Self {
             numerator: terms_lcm.clone() * numerator,
             denominator: terms_lcm * denominator,
@@ -112,7 +113,10 @@ impl RationalExpression {
         let numerator_norm = Self::get_term_to_set_power_sign(&numerator, false);
         let denominator_norm = Self::get_term_to_set_power_sign(&denominator, false);
 
-        let terms_lcm = Term::lcm(vec![numerator_norm, denominator_norm]);
+        let terms_lcm = Term::lcm(vec![numerator_norm.pow(-1), denominator_norm.pow(-1)])
+            .pow(-1)
+            .dissolve();
+        let terms_lcm = Term::from_btreemap(terms_lcm.0, 1_i64.into());
         Self {
             numerator: terms_lcm.clone() * numerator,
             denominator: terms_lcm * denominator,
@@ -403,7 +407,7 @@ mod tests {
                 .clone()
                 .change_to_negative_power()
                 .to_string(),
-            "((2/7)w⁻²x⁻⁵y⁻³z⁻⁷ + (3/14)x⁻¹² + (5/3)y⁻³z⁻⁴)/((4/49)w⁻⁴x⁻⁵y⁻³z⁻¹⁴ + (6/49)w⁻²x⁻¹²z⁻⁷ + (20/21)w⁻²y⁻³z⁻¹¹ + (9/196)x⁻¹⁹y³ + (5/7)x⁻⁷z⁻⁴ + (25/9)x⁵y⁻³z⁻⁸)"
+            "((2/7)w⁻²x⁻¹⁰y⁻⁶z⁻⁷ + (3/14)x⁻¹⁷y⁻³ + (5/3)x⁻⁵y⁻⁶z⁻⁴)/((4/49)w⁻⁴x⁻¹⁰y⁻⁶z⁻¹⁴ + (6/49)w⁻²x⁻¹⁷y⁻³z⁻⁷ + (20/21)w⁻²x⁻⁵y⁻⁶z⁻¹¹ + (9/196)x⁻²⁴ + (5/7)x⁻¹²y⁻³z⁻⁴ + (25/9)y⁻⁶z⁻⁸)"
         );
     }
 

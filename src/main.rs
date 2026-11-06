@@ -39,6 +39,6 @@ fn main() {
     let x = Variable::new('x', None);
     let poly = Polynomial::new(x, vec![1, -2, 1]);
 
-    println!("{}", poly); // x² - 2x + 1
-    println!("{}", poly.compute_nth_derivative(1));
+    println!("{}", poly); // (1) + (-2)x + (1)x²
+    println!("{}", poly.compute_nth_derivative(1)); // (-2) + (2)x
 }

@@ -130,6 +130,7 @@ impl Term {
     }
 
     /// Checks if the term is divisible by a variable raised to a specific power.
+    /// Returns true if divisor variable have lower power than this term's variable.
     pub fn is_divisible_by_variable_power(
         &self,
         divisor: Variable,
@@ -198,7 +199,7 @@ impl Term {
 
     /// Compute LCM of terms. Returns a term that is the least common multiple of the input terms.
     /// The LCM is computed by taking the maximum power of each variable across all terms.
-    /// LCM of multipliers is not considered
+    /// LCM of multipliers is not considered for LCM, but just multiplied together.
     pub fn lcm(terms: impl IntoIterator<Item = Term>) -> Term {
         let mut lcm_multiplier = TermMultiplierType::new(1, 1);
 
